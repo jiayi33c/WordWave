@@ -198,7 +198,8 @@ export const Train = forwardRef(({ isPlaying = false, ...props }, ref) => {
         {/* Smoke Particles (attached to chimney) */}
         {isPlaying && (
             <group position={[0, 2.5, -1]}>
-                <Smoke position={[0, 0, 0]} onPuff={playWhistle} />
+                {/* Removed onPuff={playWhistle} to stop frequent background chords */}
+                <Smoke position={[0, 0, 0]} />
                 <Smoke position={[0.2, -0.2, 0.2]} />
                 <Smoke position={[-0.2, -0.3, -0.1]} />
                 <Smoke position={[0.1, -0.5, -0.2]} />
