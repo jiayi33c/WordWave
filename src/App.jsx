@@ -1101,28 +1101,24 @@ function App() {
           textShadow: '3px 3px 0px white, 0 4px 12px rgba(0,0,0,0.1)',
           letterSpacing: '-1px'
         }}>
-          WordWave 🌊
+          WordWave
         </h1>
 
-        {/* Topic Input - Subtle floating pill */}
+        {/* Topic Input - Transparent floating pill */}
         <div style={{ 
           display: 'flex', 
           alignItems: 'center', 
           gap: '10px',
-          background: 'rgba(255, 255, 255, 0.6)', // More transparent
-          backdropFilter: 'blur(12px)',
-          padding: '8px 16px',
-          borderRadius: '100px', // Fully round pill
-          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-          border: '1px solid rgba(255, 255, 255, 0.4)'
+          background: 'transparent', // Fully transparent container
+          padding: '0px 8px', // Minimal padding
         }}>
-          <span style={{ fontSize: '16px', fontWeight: '800', color: '#78909C' }}>Topic:</span>
+          <span style={{ fontSize: '18px', fontWeight: '800', color: '#78909C', textShadow: '1px 1px 0px white' }}>Topic:</span>
           <input 
             type="text" 
             value={topic} 
             onChange={(e) => setTopic(e.target.value)}
             style={{
-              border: 'none', 
+              border: '2px solid rgba(255, 255, 255, 0.8)', // Subtle white border instead of background
               borderRadius: '20px',
               padding: '8px 16px',
               fontFamily: 'inherit',
@@ -1130,13 +1126,14 @@ function App() {
               color: '#455A64',
               outline: 'none',
               width: '140px',
-              background: 'white',
+              background: 'rgba(255, 255, 255, 0.3)', // Semi-transparent input
+              backdropFilter: 'blur(4px)',
               fontWeight: 'bold',
               boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
               transition: 'all 0.2s ease'
             }}
-            onFocus={(e) => e.target.style.transform = 'scale(1.02)'}
-            onBlur={(e) => e.target.style.transform = 'scale(1)'}
+            onFocus={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.6)'}
+            onBlur={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.3)'}
           />
         </div>
       </div>
