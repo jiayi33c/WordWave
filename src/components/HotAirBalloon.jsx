@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import * as Tone from 'tone';
@@ -17,128 +17,119 @@ export function HotAirBalloon({ position = [0, 20, 0], color = "#FF7043", isPlay
   const macaroonColors = ["#FFB7B2", "#B2EBF2", "#E1BEE7", "#FFF9C4", "#C8E6C9", "#FFCCBC"];
   const macaroonColor = macaroonColors[Math.floor(position[0] + position[1]) % macaroonColors.length];
   
-  // State for interaction
-  const [isBurning, setIsBurning] = useState(false);
-  const nextBurnTime = useRef(0);
+  // Sync Refs
+  const isBurningRef = useRef(false);
   const synthRef = useRef(null);
-  const hasSoundPlayed = useRef(false); // Track if sound played for current burn
+  const transportEventId = useRef(null);
 
+  // 1. Initialize Synth (Lightweight Piano)
   useEffect(() => {
-    // Initialize AMSynth for "Piano/Bell" sound
-    const synth = new Tone.PolySynth(Tone.AMSynth, {
-      harmonicity: 2.5,
-      oscillator: { type: "sine" },
-      envelope: {
-        attack: 0.01,
-        decay: 0.2,
-        sustain: 0.2,
-        release: 1.5,
-      },
-      modulation: { type: "square" },
-      modulationEnvelope: {
-        attack: 0.01,
-        decay: 0.5,
-        sustain: 0.2,
-        release: 1.5,
-      },
-      volume: -10
+    const synth = new Tone.PolySynth(Tone.Synth, {
+      maxPolyphony: 6,
+      options: {
+        oscillator: { type: "triangle" }, // Triangle sounds closer to keys than sine
+        envelope: {
+          attack: 0.02,
+          decay: 0.1,
+          sustain: 0.3,
+          release: 1,
+        },
+        volume: -10
+      }
     }).toDestination();
     
-    const reverb = new Tone.Reverb({ decay: 3, wet: 0.4 }).toDestination();
-    synth.connect(reverb);
-    
     synthRef.current = synth;
-    
-    // Initialize tracker
-    nextBurnTime.current = -1; 
 
     return () => {
-        synth.dispose();
-        reverb.dispose();
+      synth.dispose();
     };
   }, []);
 
+  // 2. Schedule Audio & Visuals together using Tone.Draw
+  useEffect(() => {
+    // Cleanup previous schedule if exists
+    if (transportEventId.current !== null) {
+      Tone.Transport.clear(transportEventId.current);
+      transportEventId.current = null;
+    }
+
+    if (isPlaying) {
+      // Create a repeating event every 4 measures
+      // We offset it based on position so they don't all fire at once (optional)
+      // But to sync with "the music", hitting on the '1' (0m) is best.
+      
+      const scheduleId = Tone.Transport.scheduleRepeat((time) => {
+        // A. TRIGGER AUDIO (Scheduled ahead of time)
+        if (synthRef.current) {
+          // Simple major chord
+          synthRef.current.triggerAttackRelease(["C5", "E5", "G5"], "8n", time);
+        }
+
+        // B. TRIGGER VISUAL (Synced to the exact frame the audio plays)
+        Tone.Draw.schedule(() => {
+          // This callback runs on the requestAnimationFrame closest to 'time'
+          isBurningRef.current = true;
+          
+          // Schedule the flame to turn off after 1 second
+          // We can use setTimeout here because we are already in the visual timeline
+          setTimeout(() => {
+            isBurningRef.current = false;
+          }, 1000);
+        }, time);
+
+      }, "4m", "0m"); // Start at 0m (beginning of a bar), repeat every 4m
+
+      transportEventId.current = scheduleId;
+    } else {
+      // Reset state when stopped
+      isBurningRef.current = false;
+    }
+
+    return () => {
+      if (transportEventId.current !== null) {
+        Tone.Transport.clear(transportEventId.current);
+      }
+      // Cancel any pending visual events
+      Tone.Draw.cancel();
+      isBurningRef.current = false;
+    };
+  }, [isPlaying]);
+
   useFrame((state, delta) => {
     const t = state.clock.getElapsedTime();
-    const now = Date.now();
-    const speed = delta * 2; // Color transition speed
+    const speed = delta * 2;
 
-    // Color transition to macaroon when playing
+    // Color updates
     if (balloonMatRef.current) {
-      const targetColor = new THREE.Color(isPlaying ? macaroonColor : color);
-      balloonMatRef.current.color.lerp(targetColor, speed);
+      balloonMatRef.current.color.lerp(new THREE.Color(isPlaying ? macaroonColor : color), speed);
     }
     if (stripesMatRef.current) {
-      const targetStripe = new THREE.Color(isPlaying ? "#FFF9C4" : "#FFCCBC"); // Lemon yellow when playing
-      stripesMatRef.current.color.lerp(targetStripe, speed);
+      stripesMatRef.current.color.lerp(new THREE.Color(isPlaying ? "#FFF9C4" : "#FFCCBC"), speed);
     }
     if (basketMatRef.current) {
-      const targetBasket = new THREE.Color(isPlaying ? "#D7CCC8" : "#8D6E63"); // Lighter brown when playing
-      basketMatRef.current.color.lerp(targetBasket, speed);
+      basketMatRef.current.color.lerp(new THREE.Color(isPlaying ? "#D7CCC8" : "#8D6E63"), speed);
     }
 
-    // 1. Check if it's time to BURN (Synced to Beat)
-    // 120 BPM = 0.5s per beat, 2.0s per bar (4/4)
-    if (isPlaying && Tone.Transport.state === 'started') {
-       const time = Tone.Transport.seconds;
-       const barDuration = 2.0; // 4 beats * 0.5s
-       const currentBar = Math.floor(time / barDuration);
-       
-       // Burn every 4 bars (on the "1")
-       // Use a ref to ensure we only trigger once per cycle
-       if (currentBar % 4 === 0 && currentBar !== nextBurnTime.current) {
-           nextBurnTime.current = currentBar; // Use this ref to store "last triggered bar" instead of time
-           
-           setIsBurning(true);
-           hasSoundPlayed.current = false;
-           
-           // Burn for 1 bar (2 seconds)
-           setTimeout(() => setIsBurning(false), 2000);
-       }
-    } else if (!isPlaying && isBurning) {
-        // Stop burning immediately if music stops
-        setIsBurning(false);
-        nextBurnTime.current = -1; // Reset tracker
-    }
-
-    // 2. Visual Animation
+    // Visual Animation
     if (ref.current) {
-        // Smooth floating movement (No shaking/jumping)
-        ref.current.position.y = position[1] + Math.sin(t * 0.5) * 1.5;
-        ref.current.rotation.y = t * 0.05;
-        
-        // 3. Flame & Light Logic
-        if (isBurning) {
-            // Flicker intensity
-            const flicker = 0.8 + Math.random() * 0.4;
-            
-            if (lightRef.current) {
-                lightRef.current.intensity = 3 * flicker;
-            }
-            
-            if (flameRef.current) {
-                flameRef.current.visible = true;
-                // Scale flame with flicker
-                const s = 1 + Math.random() * 0.5;
-                flameRef.current.scale.set(s, s * 1.5, s);
-            }
-            
-            // Play sound ONLY when fire is visible and hasn't played yet
-            if (!hasSoundPlayed.current && synthRef.current && Tone.Transport.state === 'started') {
-                hasSoundPlayed.current = true;
-                const nowTime = Tone.now();
-                const notes = Math.random() > 0.5 
-                    ? ["C4", "G4", "E5"] 
-                    : ["F4", "C5", "A5"];
-                synthRef.current.triggerAttackRelease(notes[0], "1n", nowTime, 0.6);
-                synthRef.current.triggerAttackRelease(notes[1], "1n", nowTime + 0.05, 0.5);
-                synthRef.current.triggerAttackRelease(notes[2], "1n", nowTime + 0.1, 0.4);
-            }
-        } else {
-            // Off state
-            if (lightRef.current) lightRef.current.intensity = 0;
-            if (flameRef.current) flameRef.current.visible = false;
+      ref.current.position.y = position[1] + Math.sin(t * 0.5) * 1.5;
+      ref.current.rotation.y = t * 0.05;
+      
+      // Check the Ref directly (updated by Tone.Draw)
+      const isBurning = isBurningRef.current;
+      
+      if (isBurning) {
+        const flicker = 0.8 + Math.random() * 0.4;
+        if (lightRef.current) lightRef.current.intensity = 3 * flicker;
+        if (flameRef.current) {
+          flameRef.current.visible = true;
+          const s = 1 + Math.random() * 0.5;
+          flameRef.current.scale.set(s, s * 1.5, s);
         }
+      } else {
+        if (lightRef.current) lightRef.current.intensity = 0;
+        if (flameRef.current) flameRef.current.visible = false;
+      }
     }
   });
 
