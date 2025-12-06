@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Sky, Cloud } from '@react-three/drei';
+import { Sky, Cloud, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { Train } from './components/Train';
 import { Trees } from './components/Trees';
@@ -340,14 +340,15 @@ function Track({ isPlaying }) {
   );
 }
 
-function Scene({ handPos, isPinching, words, onWordGrab, onWordDrop, onWordClick, isPlaying, musicDuration, activeWordText, droppedWords, onGestureSing }) {
+function Scene({ handPos, isPinching, words, onWordGrab, onWordDrop, onWordClick, isPlaying, musicDuration, activeWordText, droppedWords, onGestureSing, currentPhase, sessionPhase }) {
   const trainRef = useRef();
-  const [isMoving, setIsMoving] = useState(false); 
+  const [isMoving, setIsMoving] = useState(false);  
   
   // Gesture state
   const pinchStartTime = useRef(0);
   const gestureProgress = useRef(0);
   const gestureRingRef = useRef();
+  const phaseTextRef = useRef(); // Ref for animating the 3D text
   const GESTURE_THRESHOLD = 1.5; // hold for 1.5s to start
   
   // Train movement state
@@ -624,6 +625,17 @@ function Scene({ handPos, isPinching, words, onWordGrab, onWordDrop, onWordClick
       trainRef.current.rotation.x = rotationX;
     }
     
+    // Animate Phase Text
+    if (phaseTextRef.current) {
+         // Float up and down
+         phaseTextRef.current.position.y = 3.5 + Math.sin(t * 2) * 0.3;
+         // Gentle rotation wobble
+         phaseTextRef.current.rotation.z = Math.sin(t * 1.5) * 0.05;
+         // Scale pulse
+         const scale = 1 + Math.sin(t * 4) * 0.05;
+         phaseTextRef.current.scale.set(scale, scale, scale);
+    }
+    
     // Camera control
     // 1. Hand Tracking Control
     // Only move camera if hand detected AND NOT pinching
@@ -742,6 +754,34 @@ function Scene({ handPos, isPinching, words, onWordGrab, onWordDrop, onWordClick
           />
         );
       })}
+
+      {/* 3D Phase Text on Track - ONLY for "Your Turn" */}
+      {currentPhase === 'playing' && sessionPhase === 'YOUR_TURN' && (
+        <group ref={phaseTextRef} position={[0, 3.5, 5]}> 
+           {/* Shadow/Depth Layer */}
+           <Text
+             fontSize={2.0}
+             color="#EC407A"
+             position={[0.15, -0.15, -0.05]}
+             anchorX="center"
+             anchorY="middle"
+           >
+             Your Turn!
+           </Text>
+           
+           {/* Main Layer */}
+           <Text
+             fontSize={2.0}
+             color="#F8BBD0" 
+             anchorX="center"
+             anchorY="middle"
+             outlineWidth={0.15}
+             outlineColor="white"
+           >
+             Your Turn!
+           </Text>
+        </group>
+      )}
       
       {/* Gesture Feedback Ring */}
       <mesh ref={gestureRingRef} visible={false}>
@@ -766,6 +806,10 @@ function App() {
   
   // Track which word is currently being sung for visuals
   const [activeWordText, setActiveWordText] = useState(null);
+  
+  // Phase state for 3D text
+  const [currentPhase, setCurrentPhase] = useState('idle');
+  const [sessionPhase, setSessionPhase] = useState(null);
 
   // Magenta model state - loaded at app startup
   const [modelsReady, setModelsReady] = useState(false);
@@ -933,6 +977,11 @@ function App() {
     setActiveWordText(wordText);
   };
   
+  const handlePhaseChange = (phase, sPhase) => {
+      setCurrentPhase(phase);
+      setSessionPhase(sPhase);
+  };
+  
   useEffect(() => {
      if (handPos && handPos.y > 0.8) {
         setIsHoveringDropZone(true);
@@ -1019,6 +1068,8 @@ function App() {
            activeWordText={activeWordText}
            droppedWords={droppedWords}
            onGestureSing={handleSing}
+           currentPhase={currentPhase}
+           sessionPhase={sessionPhase}
         />
       </Canvas>
       
@@ -1087,6 +1138,7 @@ function App() {
         onMusicDurationCalculated={handleMusicDurationCalculated}
         onWordActive={handleWordActive}
         cameraEnabled={cameraEnabled}
+        onPhaseChange={handlePhaseChange}
       />
 
       {/* ElevenLabs Voice Agent (bottom-right) */}
