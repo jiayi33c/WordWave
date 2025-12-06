@@ -13,6 +13,7 @@ import HandInput from './components/HandInput';
 import { DropZone } from './components/DropZone';
 // CallResponsePlayer functionality is now integrated into DropZone
 import { fetchRelatedWords } from './utils/wordApi';
+import { audioService } from './services/audioService'; // Import audioService
 import * as patternService from './services/patternService';
 import { magentaService } from './services/magentaService';
 
@@ -799,6 +800,17 @@ function App() {
   const handleWordDrop = (word) => {
      // Auto-collect - no need to check drop zone hover
      console.log("Collected word:", word);
+     
+     // Play pop sound! 🎵
+     // Use woodblock or bongo for a satisfying "pop"
+     // Initialize audio first just in case
+     audioService.initialize().then(() => {
+        audioService.triggerDrum('woodblock', 0.8); 
+        audioService.triggerDrum('bongo', 0.5);
+     }).catch(() => {
+        // Silent fail if not initialized
+     });
+
      setWords(prev => prev.filter(w => w.text !== word.text));
      setDroppedWords(prev => [...prev, word]);
      // Don't auto-play - word goes to lyrics area for selection
