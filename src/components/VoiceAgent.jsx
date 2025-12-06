@@ -237,13 +237,75 @@ export default function VoiceAgent({
   const isConnected = status === "connected";
   const isConnecting = status === "connecting";
 
-  const addTranscript = useCallback((speaker, message, isAgent = false) => {
-    setTranscript((prev) => {
-      const next = [...prev, { speaker, message, isAgent }];
-      // keep last 20
-      return next.slice(-20);
-    });
-  }, []);
+  const [isListeningForWakeWord, setIsListeningForWakeWord] = useState(true);
+  const wakeWordRecognitionRef = useRef(null);
+
+  // Initialize Wake Word Listener
+  useEffect(() => {
+    // Only run if browser supports it
+    if (!('webkitSpeechRecognition' in window)) {
+      console.warn("Browser does not support Speech Recognition");
+      return;
+    }
+
+    const recognition = new window.webkitSpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (event) => {
+      const lastResult = event.results[event.results.length - 1];
+      const transcript = lastResult[0].transcript.trim().toLowerCase();
+      console.log("👂 Heard:", transcript);
+
+      // Check for wake word variations
+      if (transcript.includes("hey lulu") || transcript.includes("hey lou") || transcript.includes("hello lulu")) {
+        console.log("✨ Wake word detected!");
+        startConversation();
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Wake word error:", event.error);
+      // Restart on error if not intentionally stopped
+      if (isListeningForWakeWord && status === "disconnected") {
+          try { recognition.start(); } catch(e){}
+      }
+    };
+
+    recognition.onend = () => {
+      // Restart if supposed to be listening
+      if (isListeningForWakeWord && status === "disconnected") {
+        try { recognition.start(); } catch(e){}
+      }
+    };
+
+    wakeWordRecognitionRef.current = recognition;
+
+    // Start listening initially
+    try {
+      recognition.start();
+    } catch (e) {
+      console.warn("Failed to start wake word listener:", e);
+    }
+
+    return () => {
+      if (wakeWordRecognitionRef.current) {
+        wakeWordRecognitionRef.current.stop();
+      }
+    };
+  }, [startConversation, isListeningForWakeWord, status]);
+
+  // Stop wake word listener when connected to agent
+  useEffect(() => {
+    if (status === "connected" || status === "connecting") {
+      setIsListeningForWakeWord(false);
+      wakeWordRecognitionRef.current?.stop();
+    } else {
+      setIsListeningForWakeWord(true);
+      try { wakeWordRecognitionRef.current?.start(); } catch(e){}
+    }
+  }, [status]);
 
   // Define client tools the agent can call to interact with the app
   const getClientTools = useCallback(() => {
@@ -410,27 +472,40 @@ You can use these tools:
   return (
     <div style={{ position: "fixed", bottom: 20, right: 20, zIndex: 1000 }}>
       <Instructor speaking={isSpeaking} singing={false} />
+      
+      {/* Wake Word Status / Bye Button */}
       <div style={{ display: "flex", gap: 8, marginTop: 12, justifyContent: "flex-end" }}>
-        <button
-          onClick={isConnected ? endConversation : startConversation}
-          disabled={isConnecting}
-          style={{
-            padding: "10px 16px",
-            borderRadius: 12,
-            border: "none",
-            color: "#fff",
+        {isConnected ? (
+          <button
+            onClick={endConversation}
+            style={{
+              padding: "10px 16px",
+              borderRadius: 12,
+              border: "none",
+              color: "#fff",
+              fontWeight: "bold",
+              background: "linear-gradient(135deg,#ff6b6b,#ee5a5a)",
+              cursor: "pointer",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+            }}
+          >
+            👋 Bye
+          </button>
+        ) : (
+          <div style={{
+            padding: "8px 12px",
+            background: "rgba(255,255,255,0.9)",
+            borderRadius: 20,
+            fontSize: 12,
+            color: "#666",
             fontWeight: "bold",
-            background: isConnected
-              ? "linear-gradient(135deg,#ff6b6b,#ee5a5a)"
-              : "linear-gradient(135deg,#667eea,#764ba2)",
-            cursor: "pointer",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
-            opacity: isConnecting ? 0.7 : 1,
-          }}
-        >
-          {isConnected ? "👋 Bye" : isConnecting ? "⏳ Connecting..." : "💬 Talk"}
-        </button>
+            boxShadow: "0 2px 8px rgba(0,0,0,0.1)"
+          }}>
+            Say "Hey Lulu" to talk! 🎙️
+          </div>
+        )}
       </div>
+
       <div style={{
         position: "absolute",
         bottom: 60,
@@ -444,7 +519,7 @@ You can use these tools:
         minWidth: 160,
       }}>
         {isConnecting && "⏳ Connecting..."}
-        {(!isConnecting && !isConnected) && "Ready to talk"}
+        {(!isConnecting && !isConnected) && "Listening for 'Hey Lulu'..."}
         {isConnected && (isSpeaking ? "🗣️ Speaking..." : isListening ? "👂 Listening..." : "💭 Thinking...")}
       </div>
 
