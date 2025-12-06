@@ -1,12 +1,22 @@
 /**
  * Syllable Service - Analyzes words for rhythm
+ * Lightweight, dependency-free syllable counting.
  */
 
-import { syllable } from 'syllable';
-
 class SyllableService {
+  /**
+   * Basic syllable count using vowel group heuristic.
+   * This avoids external deps (e.g., 'syllable') to keep Vite happy.
+   */
   countSyllables(word) {
-    return syllable(word);
+    if (!word) return 1;
+    let w = word.toLowerCase().trim();
+    if (w.length <= 3) return 1;
+    // Remove silent trailing e patterns
+    w = w.replace(/(?:[^laeiouy]es|ed|[^laeiouy]e)$/, '');
+    w = w.replace(/^y/, '');
+    const matches = w.match(/[aeiouy]{1,2}/g);
+    return Math.max(1, matches ? matches.length : 1);
   }
 
   /**
