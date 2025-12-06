@@ -1,73 +1,186 @@
-import React, { useMemo, memo } from 'react';
+import React, { useMemo, memo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
 
-export const Trees = memo(function Trees({ count = 10, boundary = 100 }) {
-  const trees = useMemo(() => {
-    const temp = [];
-    const clusters = 3; // Fewer clusters for fewer trees
+const Tree = ({ position, scale, color, bounce }) => {
+  const meshRef = useRef();
+  const baseY = position[1];
+  
+  // Refs for smooth color transition
+  const trunkMatRef = useRef();
+  const leafMatRef0 = useRef();
+  const leafMatRef1 = useRef();
+  const leafMatRef2 = useRef();
+  
+  // Only use macaroon colors if bouncing (music playing)
+  const isPlaying = bounce > 0.01; 
+  
+  useFrame((state, delta) => {
+    if (meshRef.current) {
+      // Wobbly dance effect when music plays
+      const wobble = Math.sin(Date.now() * 0.01) * 0.1;
+      meshRef.current.rotation.z = wobble * bounce;
+      
+      // Jump up when bouncing
+      meshRef.current.position.y = baseY + (bounce * 0.3);
+      
+      // Squash/stretch
+      const stretch = 1 + (bounce * 0.2);
+      const squash = 1 - (bounce * 0.1);
+      meshRef.current.scale.set(scale * squash, scale * stretch, scale * squash);
+    }
     
-    for (let c = 0; c < clusters; c++) {
-      // Random center for each cluster
-      const clusterAngle = Math.random() * Math.PI * 2;
-      // Place clusters closer to the track loop (radius ~20-25)
-      const clusterRadius = 22 + Math.random() * 15; 
-      const cx = Math.sin(clusterAngle) * clusterRadius;
-      const cz = Math.cos(clusterAngle) * clusterRadius;
+    // Smooth fade for colors
+    const speed = delta * 1.5; // Slower transition (was 3) for better visibility
+    const trunkTarget = new THREE.Color(isPlaying ? "#5D4037" : "#795548"); 
+    if (trunkMatRef.current) trunkMatRef.current.color.lerp(trunkTarget, speed);
+    
+    // Leaf colors logic
+    const leafTargets = [0, 1, 2].map(offset => {
+        if (isPlaying) {
+            return new THREE.Color(macaroonColors[(Math.floor(position[0] + position[2]) + offset) % macaroonColors.length]);
+        }
+        return new THREE.Color(natureColors[offset % natureColors.length]);
+    });
+    
+    if (leafMatRef0.current) leafMatRef0.current.color.lerp(leafTargets[0], speed);
+    if (leafMatRef1.current) leafMatRef1.current.color.lerp(leafTargets[1], speed);
+    if (leafMatRef2.current) leafMatRef2.current.color.lerp(leafTargets[2], speed);
+  });
+
+  // Macaroon colors for leaves - Darker & richer to pop against pastel background
+  const macaroonColors = [
+    "#0097A7", // Deep Cyan
+    "#D81B60", // Deep Pink
+    "#8E24AA", // Deep Purple
+    "#E64A19", // Deep Orange
+    "#3949AB", // Deep Indigo
+    "#FFA000", // Deep Amber
+  ];
+  
+  // Standard nature colors
+  const natureColors = [
+    "#76FF03", // Bright Lime
+    "#C6FF00", // Yellow-Green
+    "#B2FF59", // Light Lime
+  ];
+
+  return (
+    <group ref={meshRef} position={[position[0], baseY, position[2]]} scale={scale}>
+      {/* Trunk */}
+      <mesh position={[0, 0.8, 0]}>
+         <cylinderGeometry args={[0.3, 0.4, 1.6]} />
+         <meshStandardMaterial ref={trunkMatRef} color="#795548" />
+      </mesh>
       
-      const treesInCluster = Math.floor(count / clusters);
+      {/* Leaves - Dynamic Theme */}
+      <mesh position={[0, 2.2, 0]}>
+        <sphereGeometry args={[1.2, 16, 16]} />
+        <meshStandardMaterial ref={leafMatRef0} color={natureColors[0]} />
+      </mesh>
+      <mesh position={[0.8, 1.8, 0]} scale={0.7}>
+        <sphereGeometry args={[1, 16, 16]} />
+        <meshStandardMaterial ref={leafMatRef1} color={natureColors[1]} />
+      </mesh>
+      <mesh position={[-0.8, 1.8, 0]} scale={0.7}>
+         <sphereGeometry args={[1, 16, 16]} />
+         <meshStandardMaterial ref={leafMatRef2} color={natureColors[2]} />
+      </mesh>
       
-      for (let i = 0; i < treesInCluster; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const distFromCenter = Math.random() * 8; // Tighter clusters (was 12)
+      {/* Top fruit/flower - ALWAYS colorful */}
+      <mesh position={[0, 2.8, 0]} scale={0.8}>
+         <sphereGeometry args={[1, 16, 16]} />
+         <meshStandardMaterial color={color} /> 
+      </mesh>
+    </group>
+  );
+};
+
+// Helper to get position along track (same as App.jsx)
+function getTrackPosition(angle) {
+  const r = 15 + 2 * Math.sin(4 * angle);
+  const x = Math.sin(angle) * r * 1.2; 
+  const z = Math.cos(angle) * r * 0.6; 
+  return { x, z };
+}
+
+export const Trees = memo(function Trees({ count = 20, boundary = 100, bounce = 0 }) {
+  const trees = useMemo(() => {
+    const positions = [];
+    // Macaroon palette for top accents
+    const colors = [
+      "#FF80AB", // Rose
+      "#FF9E80", // Coral
+      "#EA80FC", // Orchid
+      "#8C9EFF", // Indigo
+      "#80CBC4", // Teal
+      "#F4FF81", // Lemon
+    ];
+    
+    // Place trees along both sides of the track
+    // Station is at angle ~3.74 (Math.PI + 0.6), avoid that area
+    const stationAngle = Math.PI + 0.6;
+    const avoidRange = 0.8; // Avoid trees near station
+    
+    // Increased count for more density
+    const treeCount = Math.min(count, 24); 
+    
+    for (let i = 0; i < treeCount; i++) {
+      // Distribute trees evenly around the track
+      const baseAngle = (i / treeCount) * Math.PI * 2;
+      
+      // Skip if too close to station
+      const angleDiff = Math.abs(baseAngle - stationAngle);
+      const wrappedDiff = Math.min(angleDiff, Math.PI * 2 - angleDiff);
+      if (wrappedDiff < avoidRange) continue;
+      
+      // Get track position at this angle
+      const trackPos = getTrackPosition(baseAngle);
+      
+      // Place tree on outer side of track (add offset)
+      const outerOffset = 6 + (i % 3) * 2.5; // 6-11 units outside track (more variety)
+      const offsetX = Math.sin(baseAngle) * outerOffset;
+      const offsetZ = Math.cos(baseAngle) * outerOffset * 0.5; 
+      
+      const x = trackPos.x + offsetX;
+      const z = trackPos.z + offsetZ;
+      
+      const scale = 0.9 + (i % 5) * 0.15; // Larger, fluffier trees
+      const color = colors[i % colors.length];
+      
+      positions.push({ pos: [x, 0, z], scale, color });
+      
+      // Add MORE inner trees for density
+      if (i % 2 === 0) {
+        const innerOffset = 4 + (i % 2);
+        const innerX = trackPos.x - Math.sin(baseAngle) * innerOffset;
+        const innerZ = trackPos.z - Math.cos(baseAngle) * innerOffset * 0.5;
         
-        const x = cx + Math.sin(angle) * distFromCenter;
-        const z = cz + Math.cos(angle) * distFromCenter;
-        
-        // --- SAFETY CHECKS ---
-        const dist = Math.sqrt(x*x + z*z);
-        const stationX = -11;
-        const stationZ = -8;
-        const distToStation = Math.sqrt(Math.pow(x - stationX, 2) + Math.pow(z - stationZ, 2));
-        
-        // Hug the track tightly (14 radius), keep station clear (12)
-        if (dist < 14 || distToStation < 12) continue;
-        
-        const scaleFactor = 1 - (distFromCenter / 10); 
-        const scale = (0.8 + Math.random() * 0.6) * Math.max(0.7, scaleFactor);
-        
-        temp.push({ pos: [x, 0, z], scale });
+        // Make sure inner trees aren't too close to center
+        const distFromCenter = Math.sqrt(innerX * innerX + innerZ * innerZ);
+        if (distFromCenter > 6) {
+          positions.push({ 
+            pos: [innerX, 0, innerZ], 
+            scale: scale * 0.8, 
+            color: colors[(i + 3) % colors.length] 
+          });
+        }
       }
     }
-    return temp;
-  }, [count, boundary]);
+    
+    return positions;
+  }, [count]);
 
   return (
     <group>
       {trees.map((t, i) => (
-        <group key={i} position={t.pos} scale={[t.scale, t.scale, t.scale]}>
-          {/* Trunk */}
-          <mesh position={[0, 0.8, 0]}>
-             <cylinderGeometry args={[0.3, 0.4, 1.6]} />
-             <meshStandardMaterial color="#795548" />
-          </mesh>
-          {/* Leaves - Mixed Playful Colors */}
-          <mesh position={[0, 2.2, 0]}>
-            <sphereGeometry args={[1.2, 16, 16]} />
-            <meshStandardMaterial color="#76FF03" /> {/* Bright Lime */}
-          </mesh>
-          <mesh position={[0.8, 1.8, 0]} scale={0.7}>
-            <sphereGeometry args={[1, 16, 16]} />
-            <meshStandardMaterial color="#C6FF00" /> {/* Yellow-Green */}
-          </mesh>
-          <mesh position={[-0.8, 1.8, 0]} scale={0.7}>
-             <sphereGeometry args={[1, 16, 16]} />
-             <meshStandardMaterial color="#B2FF59" /> {/* Light Lime */}
-          </mesh>
-          {/* Maybe a fruit/flower color top? */}
-          <mesh position={[0, 2.8, 0]} scale={0.8}>
-             <sphereGeometry args={[1, 16, 16]} />
-             <meshStandardMaterial color={i % 3 === 0 ? "#FF4081" : (i % 3 === 1 ? "#FF9100" : "#64FFDA")} /> 
-          </mesh>
-        </group>
+        <Tree 
+          key={`tree-${i}`} 
+          position={t.pos} 
+          scale={t.scale} 
+          color={t.color} 
+          bounce={bounce} 
+        />
       ))}
     </group>
   );
