@@ -246,12 +246,10 @@ export function DropZone({
              };
           }
 
-          // Step 5: Calculate timing
+          // Step 5: Calculate timing - SUPER FAST!
           const wordDuration = ttsData.duration || 1.5;
-          const beatsPerSecond = TEMPO / 60;
-          const wordBeats = Math.ceil(wordDuration * beatsPerSecond);
-          const loopBeats = wordBeats + 1;
-          const loopDuration = loopBeats / beatsPerSecond;
+          // Minimal padding - just the word duration + tiny buffer
+          const loopDuration = wordDuration + 0.3;
 
           newPrepared.push({
             word,
@@ -410,7 +408,7 @@ export function DropZone({
     
     // Calculate total phrase duration
     const phraseDuration = prepared.reduce((sum, w) => sum + w.loopDuration, 0);
-    const GAP_BETWEEN_PHASES = 0.8; // Small pause between LISTEN and YOUR_TURN
+    const GAP_BETWEEN_PHASES = 0.2; // Super quick transition!
 
     // ═══════════════════════════════════════════════════════════════════════
     // LOOP 1: LISTEN - All words with voice + beats
@@ -440,9 +438,17 @@ export function DropZone({
         }
       });
 
+      // 🥁 BIG BEAT at start of each word for sync!
+      scheduleEvent(wordStartTime, () => {
+        if (!isPlayingRef.current) return;
+        audioService.triggerDrum('kick', 1.0);
+        audioService.triggerDrum('snare', 0.7);
+      });
+
       // Schedule syllable beats
+      const beatDelay = 0.05;
       wordData.syllableDrumPattern.forEach((event, sIdx) => {
-        const eventTime = wordStartTime + event.time;
+        const eventTime = wordStartTime + beatDelay + event.time;
 
         scheduleEvent(eventTime, () => {
           if (!isPlayingRef.current) return;
@@ -451,11 +457,11 @@ export function DropZone({
         });
       });
 
-      // Schedule melody
+      // Schedule melody - ALIGNED with voice (after 1 beat pickup)
       if (wordData.melody && wordData.melody.notes) {
         wordData.melody.notes.forEach(note => {
-          const stepDuration = 60 / TEMPO / 4;
-          const noteStartTime = wordStartTime + (note.quantizedStartStep * stepDuration);
+          const stepDuration = 60 / TEMPO / 4; // 16th note duration
+          const noteStartTime = wordStartTime + beatDelay + (note.quantizedStartStep * stepDuration);
           const noteDuration = (note.quantizedEndStep - note.quantizedStartStep) * stepDuration;
           const freq = Tone.Frequency(note.pitch, "midi").toNote();
           
@@ -467,9 +473,9 @@ export function DropZone({
         });
       }
 
-      // Schedule voice
+      // Schedule voice - Quick attack (half beat pickup for snappy rhythm)
       if (wordData.ttsData.audioBuffer && !wordData.ttsData.isFallback) {
-        scheduleVoice(wordData.ttsData.audioBuffer, wordStartTime);
+        scheduleVoice(wordData.ttsData.audioBuffer, wordStartTime + beatDelay);
       }
 
       wordOffset += wordData.loopDuration;
@@ -489,6 +495,8 @@ export function DropZone({
       setLoopCount(2);
     });
 
+    // YOUR TURN phase - give more time for kids to repeat!
+    const yourTurnExtraPadding = 0.5; // Extra half second per word
     wordOffset = 0;
     prepared.forEach((wordData, wordIdx) => {
       const wordStartTime = yourTurnStart + wordOffset;
@@ -504,17 +512,23 @@ export function DropZone({
         }
       });
 
+      // 🥁 BIG BEAT at start of each word for sync!
+      scheduleEvent(wordStartTime, () => {
+        if (!isPlayingRef.current) return;
+        audioService.triggerDrum('kick', 1.0);
+        audioService.triggerDrum('snare', 0.7);
+      });
+
       // Schedule syllable beats (NO voice this time!)
-      // QUANTIZED for tight musical feel in the "Your Turn" phase
+      // QUANTIZED for TIGHT musical feel in the "Your Turn" phase
+      const beatDelay2 = 0.15; // Slightly slower for YOUR TURN
       wordData.syllableDrumPattern.forEach((event, sIdx) => {
-        // Quantize relative time to nearest 16th note (0.125s at 120 BPM)
+        // Quantize relative time to nearest 16th note for tight groove
         const quantizationGrid = 60 / TEMPO / 4;
-        const rawTime = event.time;
-        const quantizedTime = Math.round(rawTime / quantizationGrid) * quantizationGrid;
+        const quantizedTime = Math.round(event.time / quantizationGrid) * quantizationGrid;
         
-        // Use quantized time if it's close enough (max 0.2s drift)
-        const finalTime = Math.abs(quantizedTime - rawTime) < 0.2 ? quantizedTime : rawTime;
-        const eventTime = wordStartTime + finalTime;
+        // Use quantized time for punchy rhythm
+        const eventTime = wordStartTime + beatDelay2 + quantizedTime;
 
         scheduleEvent(eventTime, () => {
           if (!isPlayingRef.current) return;
@@ -530,28 +544,29 @@ export function DropZone({
       if (melodyToPlay && melodyToPlay.notes) {
         melodyToPlay.notes.forEach(note => {
           const stepDuration = 60 / TEMPO / 4;
-          const noteStartTime = wordStartTime + (note.quantizedStartStep * stepDuration);
+          const noteStartTime = wordStartTime + beatDelay2 + (note.quantizedStartStep * stepDuration);
           const noteDuration = (note.quantizedEndStep - note.quantizedStartStep) * stepDuration;
           const freq = Tone.Frequency(note.pitch, "midi").toNote();
           
           const id = Tone.Transport.schedule((time) => {
             if (!isPlayingRef.current) return;
             // Play slightly louder AND shorter (Staccato) for vibrant, bouncy feel!
-            // noteDuration * 0.5 makes it punchy
             audioService.triggerMelodyNote(freq, noteDuration * 0.5, time, (note.velocity / 127) * 1.0);
           }, noteStartTime);
           scheduledIdsRef.current.push(id);
         });
       }
 
-      wordOffset += wordData.loopDuration;
+      wordOffset += wordData.loopDuration + yourTurnExtraPadding;
     });
 
     // ═══════════════════════════════════════════════════════════════════════
     // Schedule finish after both phases complete
     // ═══════════════════════════════════════════════════════════════════════
     
-    const totalDuration = (phraseDuration * 2) + GAP_BETWEEN_PHASES;
+    // YOUR TURN phase is longer due to extra padding
+    const yourTurnDuration = prepared.reduce((sum, w) => sum + w.loopDuration + yourTurnExtraPadding, 0);
+    const totalDuration = phraseDuration + GAP_BETWEEN_PHASES + yourTurnDuration;
     
     // Report duration to parent so train can sync
     if (onMusicDurationCalculated) {

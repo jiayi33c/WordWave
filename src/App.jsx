@@ -184,26 +184,56 @@ function EnvironmentController({ isPlaying }) {
   
   // Current values (refs for direct manipulation)
   const groundMatRef = useRef();
+  const skyRef = useRef();
   
   useFrame((state, delta) => {
-    // Smooth transition speed
-    const speed = delta * 2; // Adjust speed as needed
+    const t = state.clock.getElapsedTime();
     
-    // Lerp background
+    // Calculate beat for groovy effect
+    const beat = Math.sin(t * Math.PI * 4); // 120 BPM
+    const bounce = isPlaying ? Math.max(0, beat) : 0;
+    
+    // Smooth transition speed
+    const speed = delta * 2;
+    
+    // Lerp background with groove pulse
     if (state.scene.background instanceof THREE.Color) {
       state.scene.background.lerp(targetBg, speed);
+      
+      // Add brightness pulse on beat when playing
+      if (isPlaying) {
+        const pulseColor = state.scene.background.clone();
+        pulseColor.offsetHSL(0, 0, bounce * 0.1); // Brighten on beat
+        state.scene.background.copy(pulseColor);
+      }
     } else {
         state.scene.background = targetBg.clone();
     }
     
-    // Lerp fog
+    // Lerp fog with groove pulse
     if (state.scene.fog) {
       state.scene.fog.color.lerp(targetFog, speed);
+      
+      // Pulse fog distance for "breathing" effect
+      if (isPlaying) {
+        state.scene.fog.near = 60 - bounce * 10; // Fog comes closer on beat
+        state.scene.fog.far = 150 - bounce * 20;
+      } else {
+        state.scene.fog.near = 60;
+        state.scene.fog.far = 150;
+      }
     }
     
-    // Lerp ground color
+    // Lerp ground color with groove pulse
     if (groundMatRef.current) {
       groundMatRef.current.color.lerp(targetGround, speed);
+      
+      // Ground brightness pulse
+      if (isPlaying) {
+        const groundPulse = groundMatRef.current.color.clone();
+        groundPulse.offsetHSL(0, bounce * 0.1, bounce * 0.05);
+        groundMatRef.current.color.copy(groundPulse);
+      }
     }
   });
 
@@ -217,6 +247,7 @@ function EnvironmentController({ isPlaying }) {
       </mesh>
       
       <Sky 
+        ref={skyRef}
         sunPosition={[100, 40, 100]} 
         turbidity={isPlaying ? 12 : 8} 
         rayleigh={isPlaying ? 1 : 3} 
