@@ -750,12 +750,8 @@ export function DropZone({
         </button>
       )}
 
-      {/* Empty state */}
-      {droppedWords.length === 0 && (
-        <div style={styles.emptyHint}>
-          Click on word clouds above to collect them!
-        </div>
-      )}
+      {/* Empty state removed as per request */}
+
     </div>
   );
 }
