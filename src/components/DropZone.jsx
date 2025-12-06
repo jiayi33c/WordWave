@@ -246,15 +246,10 @@ export function DropZone({
              };
           }
 
-          // Step 5: Calculate timing - TIGHT and PUNCHY!
+          // Step 5: Calculate timing - SUPER FAST!
           const wordDuration = ttsData.duration || 1.5;
-          const secondsPerBeat = 60 / TEMPO; // 0.5s at 120 BPM
-          
-          // Quick calculation: just add half a beat for breathing room
-          const wordBeats = Math.ceil(wordDuration / secondsPerBeat);
-          // Round to nearest 2 beats for snappy rhythm (not 4!)
-          const loopBeats = Math.ceil((wordBeats + 1) / 2) * 2;
-          const loopDuration = loopBeats * secondsPerBeat;
+          // Minimal padding - just the word duration + tiny buffer
+          const loopDuration = wordDuration + 0.3;
 
           newPrepared.push({
             word,
@@ -413,7 +408,7 @@ export function DropZone({
     
     // Calculate total phrase duration
     const phraseDuration = prepared.reduce((sum, w) => sum + w.loopDuration, 0);
-    const GAP_BETWEEN_PHASES = 0.4; // Quick transition between LISTEN and YOUR_TURN
+    const GAP_BETWEEN_PHASES = 0.2; // Super quick transition!
 
     // ═══════════════════════════════════════════════════════════════════════
     // LOOP 1: LISTEN - All words with voice + beats
@@ -443,8 +438,8 @@ export function DropZone({
         }
       });
 
-      // Schedule syllable beats - Quick attack (half beat pickup)
-      const beatDelay = 30 / TEMPO; // Half beat = snappier!
+      // Schedule syllable beats - INSTANT attack!
+      const beatDelay = 0.05; // Almost instant!
       wordData.syllableDrumPattern.forEach((event, sIdx) => {
         const eventTime = wordStartTime + beatDelay + event.time;
 
@@ -510,7 +505,7 @@ export function DropZone({
 
       // Schedule syllable beats (NO voice this time!)
       // QUANTIZED for TIGHT musical feel in the "Your Turn" phase
-      const beatDelay2 = 30 / TEMPO; // Half beat = snappy!
+      const beatDelay2 = 0.05; // Almost instant!
       wordData.syllableDrumPattern.forEach((event, sIdx) => {
         // Quantize relative time to nearest 16th note for tight groove
         const quantizationGrid = 60 / TEMPO / 4;
