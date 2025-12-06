@@ -1,7 +1,8 @@
 import React, { useRef, useEffect, useState } from 'react';
 import Webcam from 'react-webcam';
-import { Hands } from '@mediapipe/hands';
-import { Camera } from '@mediapipe/camera_utils';
+// Use namespace imports to handle Vite/Rollup bundling differences for MediaPipe
+import * as mpHands from '@mediapipe/hands';
+import * as mpCamera from '@mediapipe/camera_utils';
 
 // Draw a cute cartoon duck!
 function drawDuck(ctx, x, y, size, billOpenAmount, facingLeft = false) {
@@ -93,6 +94,15 @@ const HandInput = ({ onHandMove, onPinch }) => {
   const smoothedPos = useRef({ x: 0.5, y: 0.5 });
 
   useEffect(() => {
+    // Safe resolution for Hands and Camera constructors to handle different build environments
+    const Hands = mpHands.Hands || (mpHands.default && mpHands.default.Hands) || window.Hands;
+    const Camera = mpCamera.Camera || (mpCamera.default && mpCamera.default.Camera) || window.Camera;
+
+    if (!Hands || !Camera) {
+        console.error("MediaPipe Hands or Camera could not be loaded.");
+        return;
+    }
+
     const hands = new Hands({
       locateFile: (file) => {
         return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
