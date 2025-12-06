@@ -22,7 +22,7 @@ const THEME = {
   dark: "#333333" // For outlines/details
 };
 
-const AGENT_ID = 'agent_9401ka964wjjfkwaza8tmx7v1nx4';
+const AGENT_ID = 'agent_0601ka0b4fqgevf91eesshqnk5fn';
 const APP_PROMPT = `
 You are a playful, kind music teacher in the Wordwave app for kids ages 5-10.
 - Goal: help kids collect word clouds, make songs, and learn what words mean.
