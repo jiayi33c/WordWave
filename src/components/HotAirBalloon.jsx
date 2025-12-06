@@ -49,8 +49,8 @@ export function HotAirBalloon({ position = [0, 20, 0], color = "#FF7043", isPlay
     
     synthRef.current = synth;
     
-    // Start loop soon
-    nextBurnTime.current = Date.now() + 1000; 
+    // Initialize tracker
+    nextBurnTime.current = -1; 
 
     return () => {
         synth.dispose();
@@ -77,21 +77,28 @@ export function HotAirBalloon({ position = [0, 20, 0], color = "#FF7043", isPlay
       basketMatRef.current.color.lerp(targetBasket, speed);
     }
 
-    // 1. Check if it's time to BURN (Only if playing!)
-    if (isPlaying && now > nextBurnTime.current) {
-       // Trigger burner (visual)
-       setIsBurning(true);
-       hasSoundPlayed.current = false; // Reset sound flag for new burn
+    // 1. Check if it's time to BURN (Synced to Beat)
+    // 120 BPM = 0.5s per beat, 2.0s per bar (4/4)
+    if (isPlaying && Tone.Transport.state === 'started') {
+       const time = Tone.Transport.seconds;
+       const barDuration = 2.0; // 4 beats * 0.5s
+       const currentBar = Math.floor(time / barDuration);
        
-       // Burn for 1-2 seconds
-       const duration = 1000 + Math.random() * 1000;
-       setTimeout(() => setIsBurning(false), duration); 
-       
-       // Schedule next burn (random 4-8 seconds)
-       nextBurnTime.current = now + 4000 + Math.random() * 4000;
+       // Burn every 4 bars (on the "1")
+       // Use a ref to ensure we only trigger once per cycle
+       if (currentBar % 4 === 0 && currentBar !== nextBurnTime.current) {
+           nextBurnTime.current = currentBar; // Use this ref to store "last triggered bar" instead of time
+           
+           setIsBurning(true);
+           hasSoundPlayed.current = false;
+           
+           // Burn for 1 bar (2 seconds)
+           setTimeout(() => setIsBurning(false), 2000);
+       }
     } else if (!isPlaying && isBurning) {
         // Stop burning immediately if music stops
         setIsBurning(false);
+        nextBurnTime.current = -1; // Reset tracker
     }
 
     // 2. Visual Animation
