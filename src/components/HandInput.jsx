@@ -282,21 +282,6 @@ const HandInput = ({ onHandMove, onPinch }) => {
           style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
         />
       </div>
-      <div style={{ 
-        position: 'absolute', 
-        top: 20, 
-        left: 20, 
-        color: 'white', 
-        fontSize: '14px', 
-        textShadow: '1px 1px 2px black',
-        background: 'rgba(255, 200, 40, 0.9)',
-        padding: '8px 15px',
-        borderRadius: '15px',
-        border: '2px solid #FFA000',
-        fontFamily: '"Comic Sans MS", sans-serif'
-      }}>
-        {isLoaded ? "🦆 Ducky Mode!" : "Loading..."}
-      </div>
     </div>
   );
 };
