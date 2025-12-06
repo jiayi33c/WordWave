@@ -367,7 +367,16 @@ You can use these tools:
         onMessage: (message) => {
           // message.type: "user_transcript" | "agent_response"
           if (message?.type === "user_transcript") {
-            addTranscript("You", message.message || "", false);
+            const text = message.message || "";
+            addTranscript("You", text, false);
+            
+            // Check for "Bye" to end conversation
+            const lowerText = text.toLowerCase();
+            if (lowerText.includes("bye") || lowerText.includes("goodbye") || lowerText.includes("see you")) {
+               setTimeout(() => {
+                 endConversation();
+               }, 2000); // Delay slightly to let the agent say goodbye if it wants (or just cut it)
+            }
           } else if (message?.type === "agent_response") {
             addTranscript("Teacher", message.message || "", true);
           }
