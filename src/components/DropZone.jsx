@@ -246,12 +246,18 @@ export function DropZone({
              };
           }
 
-          // Step 5: Calculate timing
+          // Step 5: Calculate timing - QUANTIZED to beat grid!
           const wordDuration = ttsData.duration || 1.5;
           const beatsPerSecond = TEMPO / 60;
-          const wordBeats = Math.ceil(wordDuration * beatsPerSecond);
-          const loopBeats = wordBeats + 1;
-          const loopDuration = loopBeats / beatsPerSecond;
+          const secondsPerBeat = 60 / TEMPO; // 0.5s at 120 BPM
+          
+          // Quantize word duration to nearest half-beat for tight sync
+          const wordBeats = Math.ceil(wordDuration / secondsPerBeat);
+          // Add 2 beats padding (1 before for pickup, 1 after for breath)
+          const loopBeats = wordBeats + 2;
+          // Round to nearest 4 beats (one bar) for musical phrasing
+          const barAlignedBeats = Math.ceil(loopBeats / 4) * 4;
+          const loopDuration = barAlignedBeats * secondsPerBeat;
 
           newPrepared.push({
             word,
@@ -440,9 +446,10 @@ export function DropZone({
         }
       });
 
-      // Schedule syllable beats
+      // Schedule syllable beats - ALIGNED with voice (after 1 beat pickup)
+      const beatDelay = 60 / TEMPO;
       wordData.syllableDrumPattern.forEach((event, sIdx) => {
-        const eventTime = wordStartTime + event.time;
+        const eventTime = wordStartTime + beatDelay + event.time;
 
         scheduleEvent(eventTime, () => {
           if (!isPlayingRef.current) return;
@@ -451,11 +458,11 @@ export function DropZone({
         });
       });
 
-      // Schedule melody
+      // Schedule melody - ALIGNED with voice (after 1 beat pickup)
       if (wordData.melody && wordData.melody.notes) {
         wordData.melody.notes.forEach(note => {
-          const stepDuration = 60 / TEMPO / 4;
-          const noteStartTime = wordStartTime + (note.quantizedStartStep * stepDuration);
+          const stepDuration = 60 / TEMPO / 4; // 16th note duration
+          const noteStartTime = wordStartTime + beatDelay + (note.quantizedStartStep * stepDuration);
           const noteDuration = (note.quantizedEndStep - note.quantizedStartStep) * stepDuration;
           const freq = Tone.Frequency(note.pitch, "midi").toNote();
           
@@ -467,9 +474,10 @@ export function DropZone({
         });
       }
 
-      // Schedule voice
+      // Schedule voice - START ON THE BEAT (after 1 beat pickup)
       if (wordData.ttsData.audioBuffer && !wordData.ttsData.isFallback) {
-        scheduleVoice(wordData.ttsData.audioBuffer, wordStartTime);
+        const beatDelay = 60 / TEMPO; // One beat delay for rhythmic pickup
+        scheduleVoice(wordData.ttsData.audioBuffer, wordStartTime + beatDelay);
       }
 
       wordOffset += wordData.loopDuration;
@@ -506,15 +514,15 @@ export function DropZone({
 
       // Schedule syllable beats (NO voice this time!)
       // QUANTIZED for tight musical feel in the "Your Turn" phase
+      const beatDelay2 = 60 / TEMPO; // Same beat delay as LISTEN phase
       wordData.syllableDrumPattern.forEach((event, sIdx) => {
         // Quantize relative time to nearest 16th note (0.125s at 120 BPM)
         const quantizationGrid = 60 / TEMPO / 4;
         const rawTime = event.time;
         const quantizedTime = Math.round(rawTime / quantizationGrid) * quantizationGrid;
         
-        // Use quantized time if it's close enough (max 0.2s drift)
-        const finalTime = Math.abs(quantizedTime - rawTime) < 0.2 ? quantizedTime : rawTime;
-        const eventTime = wordStartTime + finalTime;
+        // Use quantized time for tighter rhythm
+        const eventTime = wordStartTime + beatDelay2 + quantizedTime;
 
         scheduleEvent(eventTime, () => {
           if (!isPlayingRef.current) return;
@@ -530,14 +538,13 @@ export function DropZone({
       if (melodyToPlay && melodyToPlay.notes) {
         melodyToPlay.notes.forEach(note => {
           const stepDuration = 60 / TEMPO / 4;
-          const noteStartTime = wordStartTime + (note.quantizedStartStep * stepDuration);
+          const noteStartTime = wordStartTime + beatDelay2 + (note.quantizedStartStep * stepDuration);
           const noteDuration = (note.quantizedEndStep - note.quantizedStartStep) * stepDuration;
           const freq = Tone.Frequency(note.pitch, "midi").toNote();
           
           const id = Tone.Transport.schedule((time) => {
             if (!isPlayingRef.current) return;
             // Play slightly louder AND shorter (Staccato) for vibrant, bouncy feel!
-            // noteDuration * 0.5 makes it punchy
             audioService.triggerMelodyNote(freq, noteDuration * 0.5, time, (note.velocity / 127) * 1.0);
           }, noteStartTime);
           scheduledIdsRef.current.push(id);
