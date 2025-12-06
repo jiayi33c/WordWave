@@ -961,39 +961,51 @@ function App() {
       
       <div style={{
         position: 'absolute',
-        bottom: 140, 
-        left: '50%',
-        transform: 'translateX(-50%)',
+        top: 20,
+        left: 20,
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         gap: '10px',
-        pointerEvents: 'auto' // Enable interaction for input
+        pointerEvents: 'auto' 
       }}>
         <div style={{
-          background: 'rgba(255, 255, 255, 0.9)',
-          padding: '10px 20px',
-          borderRadius: '20px',
-          border: '3px solid #FFB74D',
-          textAlign: 'center',
-          boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
+          background: 'rgba(255, 255, 255, 0.95)',
+          padding: '15px 25px',
+          borderRadius: '30px', // Cloud-like roundness
+          border: '4px solid #4FC3F7', // Sky blue border
+          textAlign: 'left',
+          boxShadow: '0 8px 20px rgba(79, 195, 247, 0.3)',
+          minWidth: '200px'
         }}>
-          <h2 style={{ margin: '0 0 5px 0', color: '#FF7043', fontSize: '20px' }}>Word Cloud Sky</h2>
+          <h2 style={{ 
+            margin: '0 0 10px 0', 
+            color: '#FF9800', 
+            fontSize: '22px', 
+            fontFamily: '"Nunito", sans-serif', // Cute rounded font
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <span>🌈</span> Word Sky
+          </h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#555' }}>Topic:</span>
+            <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#78909C' }}>Topic:</span>
             <input 
               type="text" 
               value={topic} 
               onChange={(e) => setTopic(e.target.value)}
               style={{
                 border: '2px solid #B3E5FC',
-                borderRadius: '10px',
-                padding: '5px 10px',
+                borderRadius: '15px',
+                padding: '8px 15px',
                 fontFamily: 'inherit',
-                fontSize: '14px',
+                fontSize: '16px',
                 color: '#546E7A',
                 outline: 'none',
-                width: '100px'
+                width: '120px',
+                background: '#E1F5FE',
+                fontWeight: 'bold'
               }}
             />
           </div>
