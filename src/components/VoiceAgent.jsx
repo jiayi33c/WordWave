@@ -533,7 +533,7 @@ You can use these tools:
   }, []);
 
   return (
-    <div style={{ position: "fixed", bottom: 20, right: 20, zIndex: 1000 }}>
+    <div style={{ position: "fixed", bottom: 20, left: 20, zIndex: 1000 }}>
       {/* Click avatar to manually wake up */}
       <div 
         onClick={() => {

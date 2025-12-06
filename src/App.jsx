@@ -1022,12 +1022,12 @@ function App() {
         onClearLyrics={() => setDroppedWords([])}
       />
       
-      {/* Camera toggle button */}
+      {/* Camera toggle button - Moved to Top Right to avoid overlap */}
       <button
         onClick={() => setCameraEnabled(!cameraEnabled)}
         style={{
           position: 'absolute',
-          bottom: 20,
+          top: 20,
           right: 20,
           padding: '12px 20px',
           borderRadius: '20px',
@@ -1051,11 +1051,12 @@ function App() {
         {cameraEnabled ? '📷 Camera ON' : '🖱️ Mouse Mode'}
       </button>
 
-      {/* Instructions */}
+      {/* Instructions - Moved to Top Center */}
       <div style={{
         position: 'absolute',
-        bottom: 20,
-        left: 20,
+        top: 20,
+        left: '50%',
+        transform: 'translateX(-50%)',
         background: 'rgba(255, 255, 255, 0.9)',
         padding: '10px 16px',
         borderRadius: '12px',
