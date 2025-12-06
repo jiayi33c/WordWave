@@ -35,14 +35,14 @@ export function HotAirBalloon({ position = [0, 20, 0], color = "#FF7043", isPlay
           sustain: 0.2,  
           release: 0.2,  // Very short release
         },
-        volume: -18 // Softer volume
+        volume: -35 // Ultra soft background ambience
       }
     });
     
     // Add Reverb for distance
     const reverb = new Tone.Reverb({
       decay: 2.0,
-      wet: 0.3
+      wet: 0.2 // Reduced from 0.3 for clarity at low volume
     }).toDestination();
     
     synth.connect(reverb);
@@ -72,8 +72,8 @@ export function HotAirBalloon({ position = [0, 20, 0], color = "#FF7043", isPlay
           // Play G Major Whistle Chord (G-B-D)
           const notes = ["G4", "B4", "D5"];
             
-          // Very Short duration: 4n (quarter note)
-          synthRef.current.triggerAttackRelease(notes, "4n", time);
+          // Very Short duration: 4n (quarter note) - Ultra short update
+          synthRef.current.triggerAttackRelease(notes, "4n", time, 0.5); // Lower velocity (0.5) for gentler tone
         }
 
         // B. TRIGGER VISUAL (Synced to the exact frame the audio plays)
