@@ -27,7 +27,13 @@ function Track() {
   const segments = useMemo(() => {
     const temp = [];
     const count = 600; 
-    const colors = ['#FFCDD2', '#F8BBD0', '#E1BEE7', '#D1C4E9', '#C5CAE9', '#BBDEFB', '#B3E5FC', '#B2EBF2', '#B2DFDB', '#C8E6C9', '#DCEDC8', '#F0F4C3', '#FFF9C4', '#FFECB3', '#FFE0B2', '#FFCCBC'];
+    // Classic Wood Theme 🪵
+    const colors = [
+      '#D7CCC8', // Very Light Wood
+      '#BCAAA4', // Light Wood
+      '#A1887F', // Medium Wood
+      '#8D6E63'  // Warm Wood
+    ];
     
     for (let i = 0; i < count; i++) {
       const t = i / count;
@@ -225,21 +231,22 @@ function Scene({ handPos, isPinching, words, onWordGrab, onWordDrop }) {
 
   return (
     <>
-      <color attach="background" args={['#B3E5FC']} />
-      <fog attach="fog" args={['#B3E5FC', 60, 150]} />
-      <ambientLight intensity={1.0} />
-      <pointLight position={[20, 40, 20]} intensity={1.2} />
-      <directionalLight position={[-30, 50, 20]} intensity={1.5} castShadow shadow-mapSize={[2048, 2048]} />
-      <Sky sunPosition={[100, 40, 100]} turbidity={5} rayleigh={2} />
+      <color attach="background" args={['#81D4FA']} /> {/* Warmer, Brighter Blue */}
+      <fog attach="fog" args={['#81D4FA', 60, 150]} />
+      <ambientLight intensity={1.2} />
+      <pointLight position={[20, 40, 20]} intensity={1.5} />
+      <directionalLight position={[-30, 50, 20]} intensity={1.8} castShadow shadow-mapSize={[2048, 2048]} />
+      <Sky sunPosition={[100, 40, 100]} turbidity={8} rayleigh={3} />
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.2, 0]} receiveShadow>
         <planeGeometry args={[500, 500]} />
-        <meshStandardMaterial color="#A5D6A7" />
+        <meshStandardMaterial color="#66BB6A" /> {/* Vibrant Fresh Green */}
       </mesh>
       
       <Track />
       <group><Train ref={trainRef} /></group>
       <Station position={[-11.3, 3.0, -7.9]} rotation={[0, 0.6, 0]} />
-      <Trees count={30} boundary={100} />
+      {/* Trees closer to track (boundary reduced from 100 to 60) */}
+      <Trees count={10} boundary={60} />
       <Mountains count={2} boundary={140} />
       
       {/* Adjusted balloons to be visible in the camera frustum (y=14, z=34 view) */}

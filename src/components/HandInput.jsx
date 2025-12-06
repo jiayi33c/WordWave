@@ -271,20 +271,42 @@ const HandInput = ({ onHandMove, onPinch }) => {
 
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1000, pointerEvents: 'none' }}>
+      {/* Small camera feed in corner */}
+      <div style={{
+        position: 'absolute',
+        top: 20,
+        right: 20,
+        width: '160px',
+        height: '120px',
+        borderRadius: '10px',
+        overflow: 'hidden',
+        border: '3px solid white',
+        boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
+        zIndex: 1001,
+      }}>
+         <Webcam
+          ref={webcamRef}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
+          mirrored={false} // We mirror with transform to avoid React webcam prop confusion with internal canvas
+          videoConstraints={{ width: 320, height: 240 }} // Lower res for small preview
+        />
+      </div>
+
+      {/* Full screen invisible webcam for tracking logic */}
       <div style={{ 
         position: 'relative',
         width: '100%',
         height: '100%',
+        opacity: 0 // Hidden but active for coordinate mapping logic
       }}>
         <Webcam
-          ref={webcamRef}
-          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0 }}
+          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
           mirrored={true}
           videoConstraints={{ width: 1280, height: 720 }}
         />
         <canvas
           ref={canvasRef}
-          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 1 }}
         />
       </div>
       <div style={{ 

@@ -22,7 +22,11 @@ export function Mountains({ count = 4, boundary = 120 }) {
         <mesh key={i} position={m.pos} scale={m.scale}>
           {/* Use a slightly flattened sphere for a hill look */}
           <sphereGeometry args={[1, 32, 32, 0, Math.PI * 2, 0, Math.PI * 0.6]} />
-          <meshStandardMaterial color="#81C784" roughness={0.9} />
+          {/* Pastel Rainbow Mountains */}
+          <meshStandardMaterial 
+            color={i % 3 === 0 ? "#CE93D8" : (i % 3 === 1 ? "#90CAF9" : "#FFCC80")} 
+            roughness={0.9} 
+          />
         </mesh>
       ))}
       {/* A few extra distant hills for depth without clutter - REMOVED for sparse look */}

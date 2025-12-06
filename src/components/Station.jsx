@@ -6,46 +6,46 @@ export function Station(props) {
       {/* Platform */}
       <mesh position={[0, 0.5, 0]}>
         <boxGeometry args={[12, 1, 6]} />
-        <meshStandardMaterial color="#D7CCC8" />
+        <meshStandardMaterial color="#F5F5F5" /> {/* Whiter Platform */}
       </mesh>
       <mesh position={[0, 1.1, 0]}>
          <boxGeometry args={[11.8, 0.1, 5.8]} />
-         <meshStandardMaterial color="#A1887F" />
+         <meshStandardMaterial color="#FFCCBC" /> {/* Peach Top */}
       </mesh>
 
-      {/* Pillars */}
+      {/* Pillars - Playful Blue */}
       <mesh position={[-5, 2, 2]}>
         <cylinderGeometry args={[0.2, 0.2, 4]} />
-        <meshStandardMaterial color="#5D4037" />
+        <meshStandardMaterial color="#42A5F5" />
       </mesh>
       <mesh position={[5, 2, 2]}>
         <cylinderGeometry args={[0.2, 0.2, 4]} />
-        <meshStandardMaterial color="#5D4037" />
+        <meshStandardMaterial color="#42A5F5" />
       </mesh>
       <mesh position={[-5, 2, -2]}>
         <cylinderGeometry args={[0.2, 0.2, 4]} />
-        <meshStandardMaterial color="#5D4037" />
+        <meshStandardMaterial color="#42A5F5" />
       </mesh>
       <mesh position={[5, 2, -2]}>
         <cylinderGeometry args={[0.2, 0.2, 4]} />
-        <meshStandardMaterial color="#5D4037" />
+        <meshStandardMaterial color="#42A5F5" />
       </mesh>
 
-      {/* Roof */}
+      {/* Roof - Bright Red */}
       <mesh position={[0, 4.2, 0]}>
         <boxGeometry args={[14, 0.4, 8]} />
-        <meshStandardMaterial color="#EF5350" />
+        <meshStandardMaterial color="#FF5252" />
       </mesh>
       
-      {/* Bench */}
+      {/* Bench - Yellow */}
       <group position={[0, 1.5, -1]}>
          <mesh position={[-2, 0, 0]}>
             <boxGeometry args={[2, 0.1, 0.8]} />
-            <meshStandardMaterial color="#8D6E63" />
+            <meshStandardMaterial color="#FFEB3B" />
          </mesh>
          <mesh position={[2, 0, 0]}>
             <boxGeometry args={[2, 0.1, 0.8]} />
-            <meshStandardMaterial color="#8D6E63" />
+            <meshStandardMaterial color="#FFEB3B" />
          </mesh>
       </group>
 
