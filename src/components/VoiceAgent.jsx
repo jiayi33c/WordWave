@@ -500,7 +500,7 @@ You can use these tools:
             console.log("🔄 Restarting listener immediately...");
             setTimeout(() => {
                 startWakeWordListener();
-            }, 100);
+            }, 1000); // Increased delay to 1s to prevent browser throttling
         }
       };
 
@@ -603,9 +603,9 @@ You can use these tools:
         </div>
       </div>
       
-      {/* Wake Word Status - Only show if there's an ERROR or Permission issue */}
+      {/* Wake Word Status - Always show when disconnected to allow manual start */}
       <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center", justifyContent: "center" }}>
-        {!isConnected && (wakeWordStatus === 'error' || wakeWordStatus === 'permission-denied') && (
+        {!isConnected && (
           <div 
             onClick={() => {
                // Manual start on click to bypass browser autoplay policies
@@ -626,20 +626,20 @@ You can use these tools:
               gap: 6,
               cursor: 'pointer',
               border: wakeWordStatus === 'permission-denied' ? '2px solid #ff6b6b' : 'none',
-              whiteSpace: 'nowrap'
+              whiteSpace: 'nowrap',
+              opacity: isVisible ? 1 : 0.8 // Slightly transparent if avatar hidden
             }}
           >
             {/* Status Dot */}
             <div style={{
               width: 6, height: 6, borderRadius: "50%",
-              background: (wakeWordStatus === 'error' || wakeWordStatus === 'permission-denied' ? '#F44336' : '#9E9E9E'),
+              background: (wakeWordStatus === 'listening' ? '#4CAF50' : wakeWordStatus === 'error' || wakeWordStatus === 'permission-denied' ? '#F44336' : '#9E9E9E'),
+              animation: wakeWordStatus === 'listening' ? 'pulse 2s infinite' : 'none'
             }} />
             
-            {wakeWordStatus === 'permission-denied' ? (
-               'Tap to Enable Mic ⚠️'
-            ) : (
-               'Tap to Start Listening 🎙️'
-            )}
+            {wakeWordStatus === 'listening' ? 'Listening for "Hey Lulu"...' : 
+             wakeWordStatus === 'permission-denied' ? 'Tap to Enable Mic ⚠️' : 
+             'Tap to Start Listening 🎙️'}
           </div>
         )}
       </div>
