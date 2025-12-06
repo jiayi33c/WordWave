@@ -246,18 +246,15 @@ export function DropZone({
              };
           }
 
-          // Step 5: Calculate timing - QUANTIZED to beat grid!
+          // Step 5: Calculate timing - TIGHT and PUNCHY!
           const wordDuration = ttsData.duration || 1.5;
-          const beatsPerSecond = TEMPO / 60;
           const secondsPerBeat = 60 / TEMPO; // 0.5s at 120 BPM
           
-          // Quantize word duration to nearest half-beat for tight sync
+          // Quick calculation: just add half a beat for breathing room
           const wordBeats = Math.ceil(wordDuration / secondsPerBeat);
-          // Add 2 beats padding (1 before for pickup, 1 after for breath)
-          const loopBeats = wordBeats + 2;
-          // Round to nearest 4 beats (one bar) for musical phrasing
-          const barAlignedBeats = Math.ceil(loopBeats / 4) * 4;
-          const loopDuration = barAlignedBeats * secondsPerBeat;
+          // Round to nearest 2 beats for snappy rhythm (not 4!)
+          const loopBeats = Math.ceil((wordBeats + 1) / 2) * 2;
+          const loopDuration = loopBeats * secondsPerBeat;
 
           newPrepared.push({
             word,
@@ -416,7 +413,7 @@ export function DropZone({
     
     // Calculate total phrase duration
     const phraseDuration = prepared.reduce((sum, w) => sum + w.loopDuration, 0);
-    const GAP_BETWEEN_PHASES = 0.8; // Small pause between LISTEN and YOUR_TURN
+    const GAP_BETWEEN_PHASES = 0.4; // Quick transition between LISTEN and YOUR_TURN
 
     // ═══════════════════════════════════════════════════════════════════════
     // LOOP 1: LISTEN - All words with voice + beats
@@ -446,8 +443,8 @@ export function DropZone({
         }
       });
 
-      // Schedule syllable beats - ALIGNED with voice (after 1 beat pickup)
-      const beatDelay = 60 / TEMPO;
+      // Schedule syllable beats - Quick attack (half beat pickup)
+      const beatDelay = 30 / TEMPO; // Half beat = snappier!
       wordData.syllableDrumPattern.forEach((event, sIdx) => {
         const eventTime = wordStartTime + beatDelay + event.time;
 
@@ -474,9 +471,8 @@ export function DropZone({
         });
       }
 
-      // Schedule voice - START ON THE BEAT (after 1 beat pickup)
+      // Schedule voice - Quick attack (half beat pickup for snappy rhythm)
       if (wordData.ttsData.audioBuffer && !wordData.ttsData.isFallback) {
-        const beatDelay = 60 / TEMPO; // One beat delay for rhythmic pickup
         scheduleVoice(wordData.ttsData.audioBuffer, wordStartTime + beatDelay);
       }
 
@@ -513,15 +509,14 @@ export function DropZone({
       });
 
       // Schedule syllable beats (NO voice this time!)
-      // QUANTIZED for tight musical feel in the "Your Turn" phase
-      const beatDelay2 = 60 / TEMPO; // Same beat delay as LISTEN phase
+      // QUANTIZED for TIGHT musical feel in the "Your Turn" phase
+      const beatDelay2 = 30 / TEMPO; // Half beat = snappy!
       wordData.syllableDrumPattern.forEach((event, sIdx) => {
-        // Quantize relative time to nearest 16th note (0.125s at 120 BPM)
+        // Quantize relative time to nearest 16th note for tight groove
         const quantizationGrid = 60 / TEMPO / 4;
-        const rawTime = event.time;
-        const quantizedTime = Math.round(rawTime / quantizationGrid) * quantizationGrid;
+        const quantizedTime = Math.round(event.time / quantizationGrid) * quantizationGrid;
         
-        // Use quantized time for tighter rhythm
+        // Use quantized time for punchy rhythm
         const eventTime = wordStartTime + beatDelay2 + quantizedTime;
 
         scheduleEvent(eventTime, () => {
