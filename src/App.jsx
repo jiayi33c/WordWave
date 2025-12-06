@@ -929,6 +929,7 @@ function App() {
     setIsPlaying(false);
     setIsActuallyPlaying(false);
     setActiveWordText(null); // Reset active word
+    setDroppedWords([]); // Clear words to start fresh!
   };
 
   // Called when playback is stopped early
