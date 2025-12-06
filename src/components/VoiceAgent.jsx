@@ -561,26 +561,9 @@ You can use these tools:
         <Instructor speaking={isSpeaking} singing={false} />
       </div>
       
-      {/* Wake Word Status / Bye Button - Moved BELOW avatar */}
+      {/* Wake Word Status - Simplified (No Bye Button) */}
       <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center", justifyContent: "center" }}>
-        {isConnected ? (
-          <button
-            onClick={endConversation}
-            style={{
-              padding: "8px 16px",
-              borderRadius: 20,
-              border: "none",
-              color: "#fff",
-              fontWeight: "bold",
-              background: "linear-gradient(135deg,#ff6b6b,#ee5a5a)",
-              cursor: "pointer",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
-              fontSize: 14
-            }}
-          >
-            👋 Bye
-          </button>
-        ) : (
+        {!isConnected && (
           <div 
             onClick={() => {
                // Manual start on click to bypass browser autoplay policies
