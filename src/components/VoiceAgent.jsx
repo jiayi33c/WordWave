@@ -238,74 +238,17 @@ export default function VoiceAgent({
   const isConnecting = status === "connecting";
 
   const [isListeningForWakeWord, setIsListeningForWakeWord] = useState(true);
+  const [wakeWordStatus, setWakeWordStatus] = useState("inactive"); // inactive, listening, error
+  const [lastHeard, setLastHeard] = useState(""); // Debug: show what it hears
   const wakeWordRecognitionRef = useRef(null);
 
-  // Initialize Wake Word Listener
-  useEffect(() => {
-    // Only run if browser supports it
-    if (!('webkitSpeechRecognition' in window)) {
-      console.warn("Browser does not support Speech Recognition");
-      return;
-    }
-
-    const recognition = new window.webkitSpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = false;
-    recognition.lang = 'en-US';
-
-    recognition.onresult = (event) => {
-      const lastResult = event.results[event.results.length - 1];
-      const transcript = lastResult[0].transcript.trim().toLowerCase();
-      console.log("👂 Heard:", transcript);
-
-      // Check for wake word variations
-      if (transcript.includes("hey lulu") || transcript.includes("hey lou") || transcript.includes("hello lulu")) {
-        console.log("✨ Wake word detected!");
-        startConversation();
-      }
-    };
-
-    recognition.onerror = (event) => {
-      console.error("Wake word error:", event.error);
-      // Restart on error if not intentionally stopped
-      if (isListeningForWakeWord && status === "disconnected") {
-          try { recognition.start(); } catch(e){}
-      }
-    };
-
-    recognition.onend = () => {
-      // Restart if supposed to be listening
-      if (isListeningForWakeWord && status === "disconnected") {
-        try { recognition.start(); } catch(e){}
-      }
-    };
-
-    wakeWordRecognitionRef.current = recognition;
-
-    // Start listening initially
-    try {
-      recognition.start();
-    } catch (e) {
-      console.warn("Failed to start wake word listener:", e);
-    }
-
-    return () => {
-      if (wakeWordRecognitionRef.current) {
-        wakeWordRecognitionRef.current.stop();
-      }
-    };
-  }, [startConversation, isListeningForWakeWord, status]);
-
-  // Stop wake word listener when connected to agent
-  useEffect(() => {
-    if (status === "connected" || status === "connecting") {
-      setIsListeningForWakeWord(false);
-      wakeWordRecognitionRef.current?.stop();
-    } else {
-      setIsListeningForWakeWord(true);
-      try { wakeWordRecognitionRef.current?.start(); } catch(e){}
-    }
-  }, [status]);
+  const addTranscript = useCallback((speaker, message, isAgent = false) => {
+    setTranscript((prev) => {
+      const next = [...prev, { speaker, message, isAgent }];
+      // keep last 20
+      return next.slice(-20);
+    });
+  }, []);
 
   // Define client tools the agent can call to interact with the app
   const getClientTools = useCallback(() => {
@@ -380,7 +323,6 @@ You can use these tools:
 `;
       
       // Start the ElevenLabs conversation session with client tools
-      // Simplified temporarily for debugging connection
       const conversation = await Conversation.startSession({
         agentId: AGENT_ID,
         // clientTools: getClientTools(),
@@ -436,6 +378,106 @@ You can use these tools:
     }
   }, [droppedWords, topic, isPlaying, getClientTools, addTranscript]);
 
+  const endConversation = useCallback(async () => {
+    if (conversationRef.current) {
+      await conversationRef.current.endSession();
+      conversationRef.current = null;
+    }
+    setStatus("disconnected");
+    setIsSpeaking(false);
+  }, []);
+
+  // Initialize Wake Word Listener
+  const startWakeWordListener = useCallback(() => {
+    if (!('webkitSpeechRecognition' in window)) {
+      console.warn("Browser does not support Speech Recognition");
+      setWakeWordStatus("unsupported");
+      return;
+    }
+
+    try {
+      if (wakeWordRecognitionRef.current) {
+          try { wakeWordRecognitionRef.current.start(); } catch(e) {}
+          return;
+      }
+
+      const recognition = new window.webkitSpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true; // Faster feedback
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        console.log("👂 Wake word listener STARTED");
+        setWakeWordStatus("listening");
+      };
+
+      recognition.onresult = (event) => {
+        const lastResult = event.results[event.results.length - 1];
+        const transcript = lastResult[0].transcript.trim().toLowerCase();
+        setLastHeard(transcript);
+        console.log("👂 Heard:", transcript);
+
+        // Check for wake word variations
+        const variations = ["hey lulu", "hey lou", "hello lulu", "hi lulu", "hey blue", "hey google", "hey siri"];
+        
+        if (variations.some(v => transcript.includes(v))) {
+          console.log("✨ Wake word detected!");
+          startConversation();
+          recognition.stop();
+        }
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Wake word error:", event.error);
+        if (event.error === 'not-allowed') {
+           setWakeWordStatus("permission-denied");
+        } else {
+           setWakeWordStatus("error");
+        }
+      };
+
+      recognition.onend = () => {
+        console.log("💤 Wake word listener ENDED");
+        setWakeWordStatus("inactive");
+        // Auto-restart if supposed to be listening
+        if (isListeningForWakeWord && status === "disconnected") {
+           setTimeout(() => {
+             try { recognition.start(); } catch(e){}
+           }, 1000);
+        }
+      };
+
+      wakeWordRecognitionRef.current = recognition;
+      recognition.start();
+    } catch (e) {
+      console.warn("Failed to start wake word listener:", e);
+      setWakeWordStatus("error");
+    }
+  }, [isListeningForWakeWord, status, startConversation]);
+
+  useEffect(() => {
+    if (isListeningForWakeWord && status === "disconnected") {
+        startWakeWordListener();
+    }
+    return () => {
+      if (wakeWordRecognitionRef.current) {
+        wakeWordRecognitionRef.current.stop();
+        wakeWordRecognitionRef.current = null;
+      }
+    };
+  }, [isListeningForWakeWord, status, startWakeWordListener]);
+
+  // Stop wake word listener when connected to agent
+  useEffect(() => {
+    if (status === "connected" || status === "connecting") {
+      setIsListeningForWakeWord(false);
+      wakeWordRecognitionRef.current?.stop();
+    } else {
+      setIsListeningForWakeWord(true);
+      try { wakeWordRecognitionRef.current?.start(); } catch(e){}
+    }
+  }, [status]);
+
   // React to word collection events - notify agent when child collects a new word
   useEffect(() => {
     if (!conversationRef.current || !isConnected) return;
@@ -451,15 +493,6 @@ You can use these tools:
     prevWordCountRef.current = currentCount;
   }, [droppedWords, isConnected, isSpeaking]);
 
-  const endConversation = useCallback(async () => {
-    if (conversationRef.current) {
-      await conversationRef.current.endSession();
-      conversationRef.current = null;
-    }
-    setStatus("disconnected");
-    setIsSpeaking(false);
-  }, []);
-
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -474,7 +507,7 @@ You can use these tools:
       <Instructor speaking={isSpeaking} singing={false} />
       
       {/* Wake Word Status / Bye Button */}
-      <div style={{ display: "flex", gap: 8, marginTop: 12, justifyContent: "flex-end" }}>
+      <div style={{ display: "flex", gap: 8, marginTop: 12, justifyContent: "flex-end", alignItems: "center" }}>
         {isConnected ? (
           <button
             onClick={endConversation}
@@ -492,16 +525,43 @@ You can use these tools:
             👋 Bye
           </button>
         ) : (
-          <div style={{
-            padding: "8px 12px",
-            background: "rgba(255,255,255,0.9)",
-            borderRadius: 20,
-            fontSize: 12,
-            color: "#666",
-            fontWeight: "bold",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.1)"
-          }}>
-            Say "Hey Lulu" to talk! 🎙️
+          <div 
+            onClick={() => {
+               // Manual start on click to bypass browser autoplay policies
+               if (wakeWordStatus !== 'listening' && status === 'disconnected') {
+                 startWakeWordListener();
+               }
+            }}
+            style={{
+              padding: "8px 12px",
+              background: "rgba(255,255,255,0.95)",
+              borderRadius: 20,
+              fontSize: 12,
+              color: wakeWordStatus === 'error' ? '#d32f2f' : '#555',
+              fontWeight: "bold",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              cursor: wakeWordStatus !== 'listening' ? 'pointer' : 'default',
+              border: wakeWordStatus === 'permission-denied' ? '2px solid #ff6b6b' : 'none'
+            }}
+          >
+            {/* Status Dot */}
+            <div style={{
+              width: 8, height: 8, borderRadius: "50%",
+              background: wakeWordStatus === 'listening' ? '#4CAF50' : (wakeWordStatus === 'error' || wakeWordStatus === 'permission-denied' ? '#F44336' : '#9E9E9E'),
+              boxShadow: wakeWordStatus === 'listening' ? '0 0 6px #4CAF50' : 'none',
+              animation: wakeWordStatus === 'listening' ? 'pulse 1.5s infinite' : 'none'
+            }} />
+            
+            {wakeWordStatus === 'listening' ? (
+               lastHeard ? `👂 "${lastHeard}"` : 'Say "Hey Lulu" 🎙️'
+            ) : wakeWordStatus === 'permission-denied' ? (
+               'Tap to Enable Mic ⚠️'
+            ) : (
+               'Tap to Start Listening 🎙️'
+            )}
           </div>
         )}
       </div>
@@ -517,9 +577,11 @@ You can use these tools:
         color: "#666",
         boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
         minWidth: 160,
+        opacity: (isConnecting || isConnected) ? 1 : 0, // Hide when just listening for wake word (merged into the pill above)
+        pointerEvents: (isConnecting || isConnected) ? "auto" : "none",
+        transition: "opacity 0.3s ease"
       }}>
         {isConnecting && "⏳ Connecting..."}
-        {(!isConnecting && !isConnected) && "Listening for 'Hey Lulu'..."}
         {isConnected && (isSpeaking ? "🗣️ Speaking..." : isListening ? "👂 Listening..." : "💭 Thinking...")}
       </div>
 
@@ -552,4 +614,3 @@ You can use these tools:
     </div>
   );
 }
-
