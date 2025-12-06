@@ -53,7 +53,8 @@ export function DropZone({
   onPlaybackStatusChange, // New prop to notify parent of detailed status
   onMusicDurationCalculated, // Callback to report total music duration
   onWordActive, // Callback when a specific word starts playing
-  cameraEnabled = false // Prop to check if camera is active
+  cameraEnabled = false, // Prop to check if camera is active
+  onPhaseChange // Callback for phase changes (to update 3D text)
 }) {
   // Playback state
   const [phase, setPhase] = useState(PHASES.IDLE);
@@ -114,7 +115,14 @@ export function DropZone({
   // Watch for external play trigger
   // ───────────────────────────────────────────────────────────────────────────
 
-  // Notify parent of phase changes
+  // Notify parent of phase changes (for 3D text)
+  useEffect(() => {
+    if (onPhaseChange) {
+      onPhaseChange(phase, sessionPhase);
+    }
+  }, [phase, sessionPhase, onPhaseChange]);
+
+  // Notify parent of playback status (boolean)
   useEffect(() => {
     if (onPlaybackStatusChange) {
       // Only consider "playing" when actually in the PLAYING phase, not PREPARING
@@ -664,41 +672,16 @@ export function DropZone({
 
   return (
     <div style={styles.container}>
-      {/* Header with phase indicator */}
-      <div style={styles.header}>
-        {/* Hide Lyrics count when playing to keep it clean */}
-        {phase !== PHASES.PLAYING && (
-          <span style={styles.headerTitle}>
-            🎵 {droppedWords.length > 0 
-              ? `Lyrics (${droppedWords.length} word${droppedWords.length !== 1 ? 's' : ''})` 
-              : 'Collect words to sing!'}
-          </span>
-        )}
-        
-        {/* Phase badge - Show ONLY this when playing */}
-        {phase === PHASES.PLAYING && sessionPhase && (
-          <span style={{
-            ...styles.phaseBadge,
-            background: sessionPhase === LOOP_PHASES.LISTEN
-              ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-              : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'
-          }}>
-            {sessionPhase === LOOP_PHASES.LISTEN ? '👂 LISTEN' : '🎤 YOUR TURN'}
-          </span>
-        )}
-      </div>
+      {/* Header removed - Phase text is now 3D in Scene */}
+
 
       {/* Loading Bar removed! Replaced by logic to prep in background */}
       
-      {/* Celebration */}
-      {phase === PHASES.CELEBRATION && (
-        <div style={styles.celebration}>
-          🎉 Amazing Job! 🎉
-        </div>
-      )}
+      {/* Celebration removed as per request */}
 
-      {/* Words display */}
-      {droppedWords.length > 0 && phase !== PHASES.CELEBRATION && (
+
+      {/* Words display - Hide when playing (use 3D clouds instead) */}
+      {droppedWords.length > 0 && phase !== PHASES.CELEBRATION && phase !== PHASES.PLAYING && (
         <div style={styles.wordsContainer}>
           <div style={styles.wordsGrid}>
             {droppedWords.map((word, i) => {
@@ -743,28 +726,22 @@ export function DropZone({
         </div>
       )}
 
-      {/* Action button */}
-      {droppedWords.length > 0 && (!cameraEnabled || phase === PHASES.PLAYING) && (
+      {/* Action button - Hide completely when playing! */}
+      {droppedWords.length > 0 && !cameraEnabled && phase !== PHASES.PLAYING && (
         <button
-          onClick={phase === PHASES.PLAYING ? handleStop : onSing}
+          onClick={onSing}
           disabled={!canSing && phase !== PHASES.PLAYING}
           style={{
             ...styles.button,
-            background: phase === PHASES.PLAYING
-              ? 'linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%)'
-              : !isReadyToPlay
+            background: !isReadyToPlay
                 ? 'linear-gradient(135deg, #78909C 0%, #546E7A 100%)'
                 : 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
-            boxShadow: phase === PHASES.PLAYING
-              ? '0 4px 20px rgba(255, 107, 107, 0.5)'
-              : '0 4px 20px rgba(56, 239, 125, 0.5)',
+            boxShadow: '0 4px 20px rgba(56, 239, 125, 0.5)',
             opacity: (!canSing && phase !== PHASES.PLAYING) ? 0.7 : 1,
             cursor: (!canSing && phase !== PHASES.PLAYING) ? 'wait' : 'pointer',
           }}
         >
-          {phase === PHASES.PLAYING ? (
-            <>⏹ Stop</>
-          ) : !isReadyToPlay ? (
+          {!isReadyToPlay ? (
             <>⏳ Preparing Music...</>
           ) : (
             <>🎤 Sing Your Words!</>
@@ -821,6 +798,22 @@ const styles = {
     padding: '6px 16px',
     borderRadius: '20px',
     backdropFilter: 'blur(4px)',
+  },
+  phaseText: {
+    position: 'fixed', // Fixed to screen, not container
+    top: '65%', // Lower down, visually "on the track"
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    fontSize: '64px', // Super big cartoon text
+    fontWeight: '900',
+    fontFamily: '"Comic Sans MS", "Chalkboard SE", "Nunito", sans-serif',
+    whiteSpace: 'nowrap',
+    zIndex: 100, // On top of everything (3D scene)
+    animation: 'float 2s ease-in-out infinite', // Bouncy float
+    // Cartoon Text Style: Thick stroke + Shadow
+    WebkitTextStroke: '3px white', 
+    textShadow: '4px 4px 0px rgba(0,0,0,0.2)', 
+    pointerEvents: 'none',
   },
   phaseBadge: {
     display: 'flex',
@@ -957,6 +950,10 @@ if (typeof document !== 'undefined') {
         0% { transform: scale(0.8); opacity: 0; }
         50% { transform: scale(1.1); }
         100% { transform: scale(1); opacity: 1; }
+      }
+      @keyframes float {
+        0%, 100% { transform: translateX(-50%) translateY(0px); }
+        50% { transform: translateX(-50%) translateY(-10px); }
       }
     `;
     document.head.appendChild(styleSheet);
