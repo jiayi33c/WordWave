@@ -297,16 +297,15 @@ const HandInput = ({ onHandMove, onPinch }) => {
         position: 'relative',
         width: '100%',
         height: '100%',
-        opacity: 0 // Hidden but active for coordinate mapping logic
       }}>
         <Webcam
-          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0 }}
           mirrored={true}
           videoConstraints={{ width: 1280, height: 720 }}
         />
         <canvas
           ref={canvasRef}
-          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 1 }}
+          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
         />
       </div>
       <div style={{ 
