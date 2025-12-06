@@ -85,14 +85,12 @@ export function Instructor({ speaking = false, singing = false, className = "", 
       ref={containerRef}
       className={className}
       style={{
-        position: 'absolute',
-        bottom: '5%',
-        right: '5%',
         width: 280,
         height: 340,
         zIndex: 50,
         pointerEvents: 'none',
         filter: 'drop-shadow(0px 5px 15px rgba(0,0,0,0.2))',
+        position: 'relative', // Changed from absolute to relative for flex layout
         ...style,
       }}
     >
@@ -549,7 +547,7 @@ You can use these tools:
   }, []);
 
   return (
-    <div style={{ position: "fixed", bottom: 20, right: 250, zIndex: 1000 }}>
+    <div style={{ position: "fixed", bottom: 20, right: 250, zIndex: 1000, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       {/* Click avatar to manually wake up */}
       <div 
         onClick={() => {
@@ -563,20 +561,21 @@ You can use these tools:
         <Instructor speaking={isSpeaking} singing={false} />
       </div>
       
-      {/* Wake Word Status / Bye Button */}
-      <div style={{ display: "flex", gap: 8, marginTop: 12, justifyContent: "flex-end", alignItems: "center" }}>
+      {/* Wake Word Status / Bye Button - Moved BELOW avatar */}
+      <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center", justifyContent: "center" }}>
         {isConnected ? (
           <button
             onClick={endConversation}
             style={{
-              padding: "10px 16px",
-              borderRadius: 12,
+              padding: "8px 16px",
+              borderRadius: 20,
               border: "none",
               color: "#fff",
               fontWeight: "bold",
               background: "linear-gradient(135deg,#ff6b6b,#ee5a5a)",
               cursor: "pointer",
               boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+              fontSize: 14
             }}
           >
             👋 Bye
@@ -590,23 +589,24 @@ You can use these tools:
                }
             }}
             style={{
-              padding: "8px 12px",
-              background: "rgba(255,255,255,0.95)",
+              padding: "6px 12px",
+              background: "rgba(255,255,255,0.9)",
               borderRadius: 20,
-              fontSize: 12,
-              color: wakeWordStatus === 'error' ? '#d32f2f' : '#555',
+              fontSize: 11,
+              color: wakeWordStatus === 'error' ? '#d32f2f' : '#666',
               fontWeight: "bold",
               boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
               display: "flex",
               alignItems: "center",
               gap: 6,
               cursor: wakeWordStatus !== 'listening' ? 'pointer' : 'default',
-              border: wakeWordStatus === 'permission-denied' ? '2px solid #ff6b6b' : 'none'
+              border: wakeWordStatus === 'permission-denied' ? '2px solid #ff6b6b' : 'none',
+              whiteSpace: 'nowrap'
             }}
           >
             {/* Status Dot */}
             <div style={{
-              width: 8, height: 8, borderRadius: "50%",
+              width: 6, height: 6, borderRadius: "50%",
               background: wakeWordStatus === 'listening' ? '#4CAF50' : (wakeWordStatus === 'error' || wakeWordStatus === 'permission-denied' ? '#F44336' : '#9E9E9E'),
               boxShadow: wakeWordStatus === 'listening' ? '0 0 6px #4CAF50' : 'none',
               animation: wakeWordStatus === 'listening' ? 'pulse 1.5s infinite' : 'none'
@@ -623,23 +623,27 @@ You can use these tools:
         )}
       </div>
 
+      {/* Status Text Overlay (Connecting/Thinking) */}
       <div style={{
         position: "absolute",
-        bottom: 60,
-        right: 0,
+        bottom: 60, // Positioned over avatar body if needed, or we can remove if redundant
+        left: "50%",
+        transform: "translateX(-50%)",
         background: "rgba(255,255,255,0.95)",
         borderRadius: 12,
-        padding: "8px 12px",
-        fontSize: 12,
+        padding: "4px 10px",
+        fontSize: 11,
         color: "#666",
         boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-        minWidth: 160,
-        opacity: (isConnecting || isConnected) ? 1 : 0, // Hide when just listening for wake word (merged into the pill above)
-        pointerEvents: (isConnecting || isConnected) ? "auto" : "none",
-        transition: "opacity 0.3s ease"
+        minWidth: 100,
+        textAlign: "center",
+        opacity: (isConnecting || (isConnected && !isSpeaking && !isListening)) ? 1 : 0, 
+        pointerEvents: "none",
+        transition: "opacity 0.3s ease",
+        zIndex: 1001
       }}>
         {isConnecting && "⏳ Connecting..."}
-        {isConnected && (isSpeaking ? "🗣️ Speaking..." : isListening ? "👂 Listening..." : "💭 Thinking...")}
+        {isConnected && !isSpeaking && !isListening && "💭 Thinking..."}
       </div>
 
       {/* Transcript - Speech Bubbles */}
