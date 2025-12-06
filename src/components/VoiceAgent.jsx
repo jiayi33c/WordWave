@@ -625,9 +625,9 @@ You can use these tools:
         </div>
       </div>
       
-      {/* Wake Word Status - Always show when disconnected to allow manual start */}
+      {/* Wake Word Status - Only show if there's an ERROR or Permission issue */}
       <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center", justifyContent: "center" }}>
-        {!isConnected && (
+        {!isConnected && (wakeWordStatus === 'error' || wakeWordStatus === 'permission-denied') && (
           <div 
             onClick={() => {
                // Manual start on click to bypass browser autoplay policies
