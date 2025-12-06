@@ -22,26 +22,26 @@ export function HotAirBalloon({ position = [0, 20, 0], color = "#FF7043", isPlay
   const synthRef = useRef(null);
   const transportEventId = useRef(null);
 
-  // 1. Initialize Synth (Matches Train Whistle - Triangle + Reverb)
+  // 1. Initialize Synth (Whistle Sound - Triangle Wave)
   useEffect(() => {
-    // Use Triangle oscillator for a clearer, flutey tone (like the train)
+    // Use Triangle oscillator for a flutey/whistle tone
     const synth = new Tone.PolySynth(Tone.Synth, {
       maxPolyphony: 6,
       options: {
         oscillator: { type: "triangle" },
         envelope: {
-          attack: 0.05,
-          decay: 0.2,
-          sustain: 0.2,
-          release: 1.5,
+          attack: 0.05,   // Faster attack
+          decay: 0.1,
+          sustain: 0.2,  
+          release: 0.2,  // Very short release
         },
-        volume: -12
+        volume: -18 // Softer volume
       }
     });
     
-    // Add Reverb for that "background" spacious feel
+    // Add Reverb for distance
     const reverb = new Tone.Reverb({
-      decay: 3,
+      decay: 2.0,
       wet: 0.3
     }).toDestination();
     
@@ -69,23 +69,21 @@ export function HotAirBalloon({ position = [0, 20, 0], color = "#FF7043", isPlay
       const scheduleId = Tone.Transport.scheduleRepeat((time) => {
         // A. TRIGGER AUDIO (Scheduled ahead of time)
         if (synthRef.current) {
-          // Play a chord that harmonizes with the Train's G Major
-          // C Major 9 (C-E-G-B-D) sounds very dreamy and open
-          const notes = Math.random() > 0.5 
-            ? ["C4", "E4", "G4", "B4"] // C Maj7
-            : ["F4", "A4", "C5", "E5"]; // F Maj7
+          // Play G Major Whistle Chord (G-B-D)
+          const notes = ["G4", "B4", "D5"];
             
-          synthRef.current.triggerAttackRelease(notes, "2n", time);
+          // Very Short duration: 4n (quarter note)
+          synthRef.current.triggerAttackRelease(notes, "4n", time);
         }
 
         // B. TRIGGER VISUAL (Synced to the exact frame the audio plays)
         Tone.Draw.schedule(() => {
           isBurningRef.current = true;
           
-          // Burn for 2 seconds
+          // Burn short to match sound (0.8s)
           setTimeout(() => {
             isBurningRef.current = false;
-          }, 2000);
+          }, 800);
         }, time);
 
       }, "4m", "0m"); // Start at 0m, repeat every 4m
