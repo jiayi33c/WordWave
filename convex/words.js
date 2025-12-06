@@ -36,7 +36,6 @@ Requirements:
 }`;
 
     // Use gemini-1.5-flash (faster, cheaper) or gemini-1.5-pro (better quality)
-    // Try flash first, fallback to pro if needed
     const model = "gemini-1.5-flash";
     
     const res = await fetch(
@@ -68,7 +67,7 @@ Requirements:
     let jsonText = generated.trim();
     // Strip possible markdown fences
     if (jsonText.startsWith("```")) {
-      jsonText = jsonText.replace(/```json\\n?|```\\n?/g, "").replace(/```$/, "");
+      jsonText = jsonText.replace(/```json\n?|```\n?/g, "").replace(/```$/, "");
     }
 
     const parsed = JSON.parse(jsonText);

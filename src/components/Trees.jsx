@@ -12,28 +12,29 @@ const Tree = ({ position, scale, color, isPlaying, bounce = 0 }) => {
   const leafMatRef1 = useRef();
   const leafMatRef2 = useRef();
   
-  // Macaroon colors for leaves - Soft, Pastel, and Tasty!
+  // Macaroon colors for leaves - Soft but visible pastels!
   const macaroonColors = useMemo(() => [
-    "#FFB7B2", // Pastel Strawberry
-    "#B2EBF2", // Pastel Blueberry
-    "#E1BEE7", // Pastel Grape
-    "#FFF9C4", // Pastel Lemon
-    "#C8E6C9", // Pastel Pistachio
-    "#FFCCBC", // Pastel Peach
+    "#FFCDD2", // Soft Rose
+    "#B3E5FC", // Soft Sky Blue
+    "#E1BEE7", // Soft Lavender
+    "#FFF59D", // Soft Lemon
+    "#C8E6C9", // Soft Mint
+    "#FFE0B2", // Soft Peach
   ], []);
   
   // Standard nature colors
   const natureColors = useMemo(() => [
-    "#76FF03", // Bright Lime
-    "#C6FF00", // Yellow-Green
-    "#B2FF59", // Light Lime
+    "#81C784", // Medium Green
+    "#AED581", // Light Green
+    "#A5D6A7", // Soft Green
   ], []);
   
   useFrame((state, delta) => {
+    const t = state.clock.getElapsedTime();
+    
     // Local bounce calculation if prop is missing, otherwise use prop
     let effectiveBounce = bounce;
     if (bounce === 0 && isPlaying) {
-         const t = state.clock.getElapsedTime();
          effectiveBounce = Math.max(0, Math.sin(t * Math.PI * 4));
     }
     
@@ -51,19 +52,26 @@ const Tree = ({ position, scale, color, isPlaying, bounce = 0 }) => {
       meshRef.current.scale.set(scale * squash, scale * stretch, scale * squash);
     }
     
-    // Smooth fade for colors
-    const speed = delta * 3.0; // Faster transition
-    const trunkTarget = new THREE.Color(isPlaying ? "#5D4037" : "#795548"); 
-    if (trunkMatRef.current) trunkMatRef.current.color.lerp(trunkTarget, speed);
-    
-    // Leaf colors logic
+    // Color pulsing logic
+    const speed = delta * 2.0;
     const posIndex = Math.floor(position[0] + position[2]);
     
+    // Calculate color blend factor (0 = nature, 1 = macaroon)
+    // When playing, oscillate between 0 and 1 based on beat
+    // When not playing, stay at 0 (nature colors)
+    const colorBlend = isPlaying ? (Math.sin(t * 2) + 1) / 2 : 0; // Smooth oscillation 0-1
+    
+    // Trunk color - pulse between browns
+    const trunkNature = new THREE.Color("#795548");
+    const trunkMacaroon = new THREE.Color("#A1887F");
+    const trunkTarget = trunkNature.clone().lerp(trunkMacaroon, colorBlend);
+    if (trunkMatRef.current) trunkMatRef.current.color.lerp(trunkTarget, speed);
+    
+    // Leaf colors - pulse between nature and macaroon
     const leafTargets = [0, 1, 2].map(offset => {
-        if (isPlaying) {
-            return new THREE.Color(macaroonColors[(Math.abs(posIndex) + offset) % macaroonColors.length]);
-        }
-        return new THREE.Color(natureColors[offset % natureColors.length]);
+        const natureColor = new THREE.Color(natureColors[offset % natureColors.length]);
+        const macaroonColor = new THREE.Color(macaroonColors[(Math.abs(posIndex) + offset) % macaroonColors.length]);
+        return natureColor.clone().lerp(macaroonColor, colorBlend);
     });
     
     if (leafMatRef0.current) leafMatRef0.current.color.lerp(leafTargets[0], speed);
@@ -82,15 +90,15 @@ const Tree = ({ position, scale, color, isPlaying, bounce = 0 }) => {
       {/* Leaves - Dynamic Theme */}
       <mesh position={[0, 2.2, 0]}>
         <sphereGeometry args={[1.2, 16, 16]} />
-        <meshStandardMaterial ref={leafMatRef0} color={natureColors[0]} />
+        <meshStandardMaterial ref={leafMatRef0} color="#81C784" />
       </mesh>
       <mesh position={[0.8, 1.8, 0]} scale={0.7}>
         <sphereGeometry args={[1, 16, 16]} />
-        <meshStandardMaterial ref={leafMatRef1} color={natureColors[1]} />
+        <meshStandardMaterial ref={leafMatRef1} color="#AED581" />
       </mesh>
       <mesh position={[-0.8, 1.8, 0]} scale={0.7}>
          <sphereGeometry args={[1, 16, 16]} />
-         <meshStandardMaterial ref={leafMatRef2} color={natureColors[2]} />
+         <meshStandardMaterial ref={leafMatRef2} color="#A5D6A7" />
       </mesh>
       
       {/* Top fruit/flower - ALWAYS colorful */}
