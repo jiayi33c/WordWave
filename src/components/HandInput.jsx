@@ -118,35 +118,33 @@ const HandInput = ({ onHandMove, onPinch }) => {
       canvasCtx.scale(-1, 1); // Mirror for drawing
 
       // --- DRAW CAMERA FEED PREVIEW ---
-      // Draw a small preview of the camera feed in the top-right corner
-      // Since we are mirrored with scale(-1, 1) and translated to (width, 0),
-      // drawing at (0,0) will place it at the top-RIGHT of the screen visually.
+      // Draw a small preview of the camera feed in the bottom-right corner
+      // Since we are mirrored with scale(-1, 1) and translated to (width, 0):
+      // Origin (0,0) is Top-Right visually.
+      // x increases to the LEFT visually.
+      // y increases to the BOTTOM visually.
       if (results.image) {
         canvasCtx.save();
         // Flip the image back so the preview looks like a mirror (standard for webcam)
-        // Wait, the context is already flipped. If we draw the image normally, it will appear flipped (mirrored).
-        // This is what we want for a "mirror" view.
         
-        // Position: Top Right (0,0 in this coordinate system)
-        const previewW = videoWidth * 0.2; // 20% size
-        const previewH = videoHeight * 0.2;
+        const previewW = videoWidth * 0.15; // 15% size (smaller)
+        const previewH = videoHeight * 0.15;
         const margin = 20;
+        
+        // Position: Bottom Right
+        // In this coordinate system (Origin=TopRight):
+        // x = margin (Visual Right side)
+        // y = videoHeight - previewH - margin (Visual Bottom side)
+        const x = margin;
+        const y = videoHeight - previewH - margin;
         
         // Add a white border/background
         canvasCtx.fillStyle = 'white';
-        canvasCtx.fillRect(margin - 5, margin - 5, previewW + 10, previewH + 10);
+        canvasCtx.fillRect(x - 5, y - 5, previewW + 10, previewH + 10);
         
         // Draw the video frame
-        canvasCtx.drawImage(results.image, margin, margin, previewW, previewH);
+        canvasCtx.drawImage(results.image, x, y, previewW, previewH);
         
-        // Add "Camera" label
-        canvasCtx.scale(-1, 1); // Un-mirror text
-        canvasCtx.fillStyle = '#333';
-        canvasCtx.font = '12px Arial';
-        // Calculate text position. We un-mirrored, so X is negative.
-        // The box is at +margin. 
-        // -margin - previewW/2 = center of box
-        canvasCtx.fillText("Camera", -margin - previewW + 5, margin + previewH + 20);
         canvasCtx.restore();
       }
 
