@@ -1,6 +1,6 @@
 /**
  * VoiceAgent - ElevenLabs conversational agent with animated instructor model
- * Agent ID: agent_9401ka964wjjfkwaza8tmx7v1nx4
+ * Agent ID: agent_0601ka0b4fqgevf91eesshqnk5fn
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
