@@ -421,22 +421,25 @@ You can use these tools:
     isListeningForWakeWordRef.current = isListeningForWakeWord;
   }, [isListeningForWakeWord]);
 
-  // Initialize Wake Word Listener
+  // Initialize Wake Word Listener - ROBUST VERSION
   const startWakeWordListener = useCallback(() => {
-    if (!('webkitSpeechRecognition' in window)) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
       console.warn("Browser does not support Speech Recognition");
       setWakeWordStatus("unsupported");
+      alert("Voice features require Chrome or Edge browser!");
       return;
     }
 
     try {
+      // Force stop any existing instance
       if (wakeWordRecognitionRef.current) {
-          // Already running? stop it first to be clean
           try { wakeWordRecognitionRef.current.stop(); } catch(e){}
           wakeWordRecognitionRef.current = null;
       }
 
-      const recognition = new window.webkitSpeechRecognition();
+      const recognition = new SpeechRecognition();
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.lang = 'en-US';
@@ -450,6 +453,8 @@ You can use these tools:
         const lastResult = event.results[event.results.length - 1];
         const transcript = lastResult[0].transcript.trim().toLowerCase();
         setLastHeard(transcript);
+        
+        // Debug log to see what it hears
         console.log("👂 Heard:", transcript);
 
         // Check for wake word variations
@@ -461,16 +466,16 @@ You can use these tools:
         if (variations.some(v => transcript.includes(v))) {
           setIsVisible(true); // Show agent on wake word!
           if (isConnectedRef.current) {
-             console.log("⚠️ Wake word detected but already connected.");
              return;
           }
-          console.log("✨ Wake word detected!");
+          console.log("✨ Wake word detected! Starting conversation...");
           
           // Stop listening logic immediately
           isListeningForWakeWordRef.current = false;
           setIsListeningForWakeWord(false);
           recognition.stop(); 
           
+          // Start the actual ElevenLabs conversation
           if (startConversationRef.current) {
             startConversationRef.current();
           }
@@ -481,10 +486,11 @@ You can use these tools:
         console.error("Wake word error:", event.error);
         if (event.error === 'not-allowed') {
            setWakeWordStatus("permission-denied");
-           isListeningForWakeWordRef.current = false; // Stop trying
+           isListeningForWakeWordRef.current = false; 
            setIsListeningForWakeWord(false);
+           alert("Microphone access denied. Please enable microphone permissions.");
         } else if (event.error === 'no-speech') {
-           // Ignore no-speech errors, just keep listening
+           // Ignore
         } else {
            setWakeWordStatus("error");
         }
@@ -497,20 +503,21 @@ You can use these tools:
         
         // Immediate restart if we should be listening!
         if (isListeningForWakeWordRef.current && status === 'disconnected') {
-            console.log("🔄 Restarting listener immediately...");
+            console.log("🔄 Restarting listener...");
             setTimeout(() => {
                 startWakeWordListener();
-            }, 1000); // Increased delay to 1s to prevent browser throttling
+            }, 500);
         }
       };
 
       wakeWordRecognitionRef.current = recognition;
       recognition.start();
     } catch (e) {
-      console.warn("Failed to start wake word listener:", e);
+      console.error("Failed to start wake word listener:", e);
       setWakeWordStatus("error");
+      alert("Failed to start voice listener: " + e.message);
     }
-  }, [status]); // Depend on status to ensure fresh callbacks if needed
+  }, [status]);
 
   // Effect to manage auto-restart logic
   useEffect(() => {
@@ -633,28 +640,29 @@ You can use these tools:
               background: "rgba(255,255,255,0.9)",
               borderRadius: 20,
               fontSize: 11,
-              color: wakeWordStatus === 'error' ? '#d32f2f' : '#666',
+              color: wakeWordStatus === 'error' ? '#d32f2f' : '#333',
               fontWeight: "bold",
               boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
               display: "flex",
               alignItems: "center",
               gap: 6,
               cursor: 'pointer',
-              border: wakeWordStatus === 'permission-denied' ? '2px solid #ff6b6b' : 'none',
+              border: wakeWordStatus === 'listening' ? '2px solid #4CAF50' : (wakeWordStatus === 'permission-denied' ? '2px solid #ff6b6b' : '2px solid #FF9800'),
               whiteSpace: 'nowrap',
-              opacity: isVisible ? 1 : 0.8 // Slightly transparent if avatar hidden
+              opacity: isVisible ? 1 : 0.9,
+              transform: 'scale(1.05)'
             }}
           >
             {/* Status Dot */}
             <div style={{
-              width: 6, height: 6, borderRadius: "50%",
-              background: (wakeWordStatus === 'listening' ? '#4CAF50' : wakeWordStatus === 'error' || wakeWordStatus === 'permission-denied' ? '#F44336' : '#9E9E9E'),
+              width: 8, height: 8, borderRadius: "50%",
+              background: (wakeWordStatus === 'listening' ? '#4CAF50' : wakeWordStatus === 'error' || wakeWordStatus === 'permission-denied' ? '#F44336' : '#FF9800'),
               animation: wakeWordStatus === 'listening' ? 'pulse 2s infinite' : 'none'
             }} />
             
             {wakeWordStatus === 'listening' ? 'Listening for "Hey Lulu"...' : 
              wakeWordStatus === 'permission-denied' ? 'Tap to Enable Mic ⚠️' : 
-             'Tap to Start Listening 🎙️'}
+             'Tap to Activate Lulu 🎙️'}
           </div>
         )}
       </div>
