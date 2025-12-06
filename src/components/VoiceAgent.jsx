@@ -292,7 +292,18 @@ export default function VoiceAgent({
     };
   }, [droppedWords, topic, isPlaying, onSing, onClearLyrics]);
 
+  const isConnectedRef = useRef(false);
+  
+  useEffect(() => {
+    isConnectedRef.current = status === 'connected' || status === 'connecting';
+  }, [status]);
+
   const startConversation = useCallback(async () => {
+    if (isConnectedRef.current || conversationRef.current) {
+        console.warn("Conversation already active, ignoring start request");
+        return;
+    }
+
     try {
       setStatus("connecting");
       
@@ -430,11 +441,16 @@ You can use these tools:
         ];
         
         if (variations.some(v => transcript.includes(v))) {
+          if (isConnectedRef.current) {
+             console.log("⚠️ Wake word detected but already connected.");
+             return;
+          }
           console.log("✨ Wake word detected!");
+          recognition.stop(); // Stop immediately
+          
           if (startConversationRef.current) {
             startConversationRef.current();
           }
-          recognition.stop();
         }
       };
 
@@ -533,7 +549,7 @@ You can use these tools:
   }, []);
 
   return (
-    <div style={{ position: "fixed", bottom: 20, left: 20, zIndex: 1000 }}>
+    <div style={{ position: "fixed", bottom: 20, right: 250, zIndex: 1000 }}>
       {/* Click avatar to manually wake up */}
       <div 
         onClick={() => {
@@ -626,28 +642,41 @@ You can use these tools:
         {isConnected && (isSpeaking ? "🗣️ Speaking..." : isListening ? "👂 Listening..." : "💭 Thinking...")}
       </div>
 
-      {/* Transcript */}
+      {/* Transcript - Speech Bubbles */}
       {transcript.length > 0 && (
         <div style={{
           position: "absolute",
-          bottom: 120,
+          bottom: 350, // Moved up above the avatar
           right: 0,
-          width: 260,
-          maxHeight: 220,
+          width: 280,
+          maxHeight: 200,
           overflowY: "auto",
-          background: "rgba(255,255,255,0.95)",
-          borderRadius: 12,
+          display: "flex",
+          flexDirection: "column",
+          gap: "8px",
           padding: "10px",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-          fontSize: 12,
-          color: "#444",
+          // Hide scrollbar but allow scrolling
+          scrollbarWidth: "none", 
+          msOverflowStyle: "none",
         }}>
           {transcript.map((msg, idx) => (
-            <div key={idx} style={{ marginBottom: 6, lineHeight: 1.3 }}>
-              <strong style={{ color: msg.isAgent ? "#7e57c2" : "#1565c0" }}>
-                {msg.isAgent ? "Teacher" : "You"}:
-              </strong>{" "}
-              <span>{msg.message}</span>
+            <div key={idx} style={{ 
+              alignSelf: msg.isAgent ? "flex-end" : "flex-start",
+              background: msg.isAgent ? "white" : "rgba(255,255,255,0.8)",
+              padding: "8px 12px",
+              borderRadius: "12px",
+              borderBottomRightRadius: msg.isAgent ? "2px" : "12px",
+              borderBottomLeftRadius: msg.isAgent ? "12px" : "2px",
+              boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+              maxWidth: "90%",
+              fontSize: "13px",
+              color: "#444",
+              lineHeight: 1.4
+            }}>
+              <span style={{ fontWeight: "bold", color: msg.isAgent ? "#7e57c2" : "#1565c0", marginRight: "4px" }}>
+                {msg.isAgent ? "Lulu:" : "You:"}
+              </span>
+              {msg.message}
             </div>
           ))}
         </div>

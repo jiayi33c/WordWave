@@ -1051,25 +1051,7 @@ function App() {
         {cameraEnabled ? '📷 Camera ON' : '🖱️ Mouse Mode'}
       </button>
 
-      {/* Instructions - Moved to Top Center */}
-      <div style={{
-        position: 'absolute',
-        top: 20,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        background: 'rgba(255, 255, 255, 0.9)',
-        padding: '10px 16px',
-        borderRadius: '12px',
-        fontSize: '13px',
-        color: '#546E7A',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-        zIndex: 100,
-        pointerEvents: 'none'
-      }}>
-        {cameraEnabled 
-          ? '🦆 Use hand gestures to grab words!' 
-          : '🖱️ Click on word clouds to collect them!'}
-      </div>
+      {/* Instructions removed as per request */}
     </div>
   );
 }
