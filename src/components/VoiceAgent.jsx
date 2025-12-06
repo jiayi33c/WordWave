@@ -387,6 +387,12 @@ You can use these tools:
     setIsSpeaking(false);
   }, []);
 
+  // Ref to hold the latest startConversation to avoid restarting listener on every state change
+  const startConversationRef = useRef(startConversation);
+  useEffect(() => {
+    startConversationRef.current = startConversation;
+  }, [startConversation]);
+
   // Initialize Wake Word Listener
   const startWakeWordListener = useCallback(() => {
     if (!('webkitSpeechRecognition' in window)) {
@@ -397,7 +403,7 @@ You can use these tools:
 
     try {
       if (wakeWordRecognitionRef.current) {
-          try { wakeWordRecognitionRef.current.start(); } catch(e) {}
+          // Already running
           return;
       }
 
@@ -418,11 +424,16 @@ You can use these tools:
         console.log("👂 Heard:", transcript);
 
         // Check for wake word variations
-        const variations = ["hey lulu", "hey lou", "hello lulu", "hi lulu", "hey blue", "hey google", "hey siri"];
+        const variations = [
+          "hey lulu", "hey lou", "hello lulu", "hi lulu", "hey blue", 
+          "lulu", "lou lou", "teacher", "hey teacher", "hello", "hey"
+        ];
         
         if (variations.some(v => transcript.includes(v))) {
           console.log("✨ Wake word detected!");
-          startConversation();
+          if (startConversationRef.current) {
+            startConversationRef.current();
+          }
           recognition.stop();
         }
       };
@@ -431,6 +442,8 @@ You can use these tools:
         console.error("Wake word error:", event.error);
         if (event.error === 'not-allowed') {
            setWakeWordStatus("permission-denied");
+        } else if (event.error === 'no-speech') {
+           // Ignore no-speech errors, just keep listening (or it will auto-restart onend)
         } else {
            setWakeWordStatus("error");
         }
@@ -439,12 +452,10 @@ You can use these tools:
       recognition.onend = () => {
         console.log("💤 Wake word listener ENDED");
         setWakeWordStatus("inactive");
-        // Auto-restart if supposed to be listening
-        if (isListeningForWakeWord && status === "disconnected") {
-           setTimeout(() => {
-             try { recognition.start(); } catch(e){}
-           }, 1000);
-        }
+        
+        // Check ref value directly inside the callback to get fresh state
+        // We can't rely on the closure's isListeningForWakeWord because it might be stale
+        // But we can check the status prop or a ref for listening state
       };
 
       wakeWordRecognitionRef.current = recognition;
@@ -453,13 +464,32 @@ You can use these tools:
       console.warn("Failed to start wake word listener:", e);
       setWakeWordStatus("error");
     }
-  }, [isListeningForWakeWord, status, startConversation]);
+  }, []); // No dependencies! Stable callback.
+
+  // Effect to manage auto-restart logic
+  useEffect(() => {
+    const checkRestart = () => {
+        if (isListeningForWakeWord && status === "disconnected" && wakeWordStatus === "inactive") {
+            // Try to restart if we should be listening but are inactive
+             if (wakeWordRecognitionRef.current) {
+                 try { wakeWordRecognitionRef.current.start(); } catch(e){}
+             } else {
+                 startWakeWordListener();
+             }
+        }
+    };
+    
+    const interval = setInterval(checkRestart, 2000);
+    return () => clearInterval(interval);
+  }, [isListeningForWakeWord, status, wakeWordStatus, startWakeWordListener]);
 
   useEffect(() => {
     if (isListeningForWakeWord && status === "disconnected") {
         startWakeWordListener();
     }
     return () => {
+       // Don't stop on unmount of effect if we want it to persist? 
+       // No, we must stop to clean up.
       if (wakeWordRecognitionRef.current) {
         wakeWordRecognitionRef.current.stop();
         wakeWordRecognitionRef.current = null;
@@ -504,7 +534,18 @@ You can use these tools:
 
   return (
     <div style={{ position: "fixed", bottom: 20, right: 20, zIndex: 1000 }}>
-      <Instructor speaking={isSpeaking} singing={false} />
+      {/* Click avatar to manually wake up */}
+      <div 
+        onClick={() => {
+          if (!isConnected && !isConnecting) {
+            startConversation();
+          }
+        }}
+        style={{ cursor: !isConnected ? 'pointer' : 'default' }}
+        title="Click to talk!"
+      >
+        <Instructor speaking={isSpeaking} singing={false} />
+      </div>
       
       {/* Wake Word Status / Bye Button */}
       <div style={{ display: "flex", gap: 8, marginTop: 12, justifyContent: "flex-end", alignItems: "center" }}>
