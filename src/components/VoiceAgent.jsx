@@ -413,6 +413,14 @@ You can use these tools:
     startConversationRef.current = startConversation;
   }, [startConversation]);
 
+  // Ref to track listening intent for callbacks
+  const isListeningForWakeWordRef = useRef(true);
+  
+  // Update ref when state changes
+  useEffect(() => {
+    isListeningForWakeWordRef.current = isListeningForWakeWord;
+  }, [isListeningForWakeWord]);
+
   // Initialize Wake Word Listener
   const startWakeWordListener = useCallback(() => {
     if (!('webkitSpeechRecognition' in window)) {
@@ -423,13 +431,14 @@ You can use these tools:
 
     try {
       if (wakeWordRecognitionRef.current) {
-          // Already running
-          return;
+          // Already running? stop it first to be clean
+          try { wakeWordRecognitionRef.current.stop(); } catch(e){}
+          wakeWordRecognitionRef.current = null;
       }
 
       const recognition = new window.webkitSpeechRecognition();
       recognition.continuous = true;
-      recognition.interimResults = true; // Faster feedback
+      recognition.interimResults = true;
       recognition.lang = 'en-US';
 
       recognition.onstart = () => {
@@ -456,7 +465,11 @@ You can use these tools:
              return;
           }
           console.log("✨ Wake word detected!");
-          recognition.stop(); // Stop immediately
+          
+          // Stop listening logic immediately
+          isListeningForWakeWordRef.current = false;
+          setIsListeningForWakeWord(false);
+          recognition.stop(); 
           
           if (startConversationRef.current) {
             startConversationRef.current();
@@ -468,8 +481,10 @@ You can use these tools:
         console.error("Wake word error:", event.error);
         if (event.error === 'not-allowed') {
            setWakeWordStatus("permission-denied");
+           isListeningForWakeWordRef.current = false; // Stop trying
+           setIsListeningForWakeWord(false);
         } else if (event.error === 'no-speech') {
-           // Ignore no-speech errors, just keep listening (or it will auto-restart onend)
+           // Ignore no-speech errors, just keep listening
         } else {
            setWakeWordStatus("error");
         }
@@ -478,10 +493,15 @@ You can use these tools:
       recognition.onend = () => {
         console.log("💤 Wake word listener ENDED");
         setWakeWordStatus("inactive");
+        wakeWordRecognitionRef.current = null;
         
-        // Check ref value directly inside the callback to get fresh state
-        // We can't rely on the closure's isListeningForWakeWord because it might be stale
-        // But we can check the status prop or a ref for listening state
+        // Immediate restart if we should be listening!
+        if (isListeningForWakeWordRef.current && status === 'disconnected') {
+            console.log("🔄 Restarting listener immediately...");
+            setTimeout(() => {
+                startWakeWordListener();
+            }, 100);
+        }
       };
 
       wakeWordRecognitionRef.current = recognition;
@@ -490,7 +510,7 @@ You can use these tools:
       console.warn("Failed to start wake word listener:", e);
       setWakeWordStatus("error");
     }
-  }, []); // No dependencies! Stable callback.
+  }, [status]); // Depend on status to ensure fresh callbacks if needed
 
   // Effect to manage auto-restart logic
   useEffect(() => {
