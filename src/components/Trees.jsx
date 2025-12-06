@@ -2,7 +2,7 @@ import React, { useMemo, memo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-const Tree = ({ position, scale, color, bounce }) => {
+const Tree = ({ position, scale, color, isPlaying, bounce = 0 }) => {
   const meshRef = useRef();
   const baseY = position[1];
   
@@ -12,33 +12,56 @@ const Tree = ({ position, scale, color, bounce }) => {
   const leafMatRef1 = useRef();
   const leafMatRef2 = useRef();
   
-  // Only use macaroon colors if bouncing (music playing)
-  const isPlaying = bounce > 0.01; 
+  // Macaroon colors for leaves - Soft, Pastel, and Tasty!
+  const macaroonColors = useMemo(() => [
+    "#FFB7B2", // Pastel Strawberry
+    "#B2EBF2", // Pastel Blueberry
+    "#E1BEE7", // Pastel Grape
+    "#FFF9C4", // Pastel Lemon
+    "#C8E6C9", // Pastel Pistachio
+    "#FFCCBC", // Pastel Peach
+  ], []);
+  
+  // Standard nature colors
+  const natureColors = useMemo(() => [
+    "#76FF03", // Bright Lime
+    "#C6FF00", // Yellow-Green
+    "#B2FF59", // Light Lime
+  ], []);
   
   useFrame((state, delta) => {
+    // Local bounce calculation if prop is missing, otherwise use prop
+    let effectiveBounce = bounce;
+    if (bounce === 0 && isPlaying) {
+         const t = state.clock.getElapsedTime();
+         effectiveBounce = Math.max(0, Math.sin(t * Math.PI * 4));
+    }
+    
     if (meshRef.current) {
       // Wobbly dance effect when music plays
       const wobble = Math.sin(Date.now() * 0.01) * 0.1;
-      meshRef.current.rotation.z = wobble * bounce;
+      meshRef.current.rotation.z = wobble * effectiveBounce;
       
       // Jump up when bouncing
-      meshRef.current.position.y = baseY + (bounce * 0.3);
+      meshRef.current.position.y = baseY + (effectiveBounce * 0.5);
       
       // Squash/stretch
-      const stretch = 1 + (bounce * 0.2);
-      const squash = 1 - (bounce * 0.1);
+      const stretch = 1 + (effectiveBounce * 0.3);
+      const squash = 1 - (effectiveBounce * 0.15);
       meshRef.current.scale.set(scale * squash, scale * stretch, scale * squash);
     }
     
     // Smooth fade for colors
-    const speed = delta * 1.5; // Slower transition (was 3) for better visibility
+    const speed = delta * 3.0; // Faster transition
     const trunkTarget = new THREE.Color(isPlaying ? "#5D4037" : "#795548"); 
     if (trunkMatRef.current) trunkMatRef.current.color.lerp(trunkTarget, speed);
     
     // Leaf colors logic
+    const posIndex = Math.floor(position[0] + position[2]);
+    
     const leafTargets = [0, 1, 2].map(offset => {
         if (isPlaying) {
-            return new THREE.Color(macaroonColors[(Math.floor(position[0] + position[2]) + offset) % macaroonColors.length]);
+            return new THREE.Color(macaroonColors[(Math.abs(posIndex) + offset) % macaroonColors.length]);
         }
         return new THREE.Color(natureColors[offset % natureColors.length]);
     });
@@ -47,23 +70,6 @@ const Tree = ({ position, scale, color, bounce }) => {
     if (leafMatRef1.current) leafMatRef1.current.color.lerp(leafTargets[1], speed);
     if (leafMatRef2.current) leafMatRef2.current.color.lerp(leafTargets[2], speed);
   });
-
-  // Macaroon colors for leaves - Darker & richer to pop against pastel background
-  const macaroonColors = [
-    "#0097A7", // Deep Cyan
-    "#D81B60", // Deep Pink
-    "#8E24AA", // Deep Purple
-    "#E64A19", // Deep Orange
-    "#3949AB", // Deep Indigo
-    "#FFA000", // Deep Amber
-  ];
-  
-  // Standard nature colors
-  const natureColors = [
-    "#76FF03", // Bright Lime
-    "#C6FF00", // Yellow-Green
-    "#B2FF59", // Light Lime
-  ];
 
   return (
     <group ref={meshRef} position={[position[0], baseY, position[2]]} scale={scale}>
@@ -104,7 +110,7 @@ function getTrackPosition(angle) {
   return { x, z };
 }
 
-export const Trees = memo(function Trees({ count = 20, boundary = 100, bounce = 0 }) {
+export const Trees = memo(function Trees({ count = 20, boundary = 100, isPlaying = false, bounce = 0 }) {
   const trees = useMemo(() => {
     const positions = [];
     // Macaroon palette for top accents
@@ -179,7 +185,8 @@ export const Trees = memo(function Trees({ count = 20, boundary = 100, bounce = 
           position={t.pos} 
           scale={t.scale} 
           color={t.color} 
-          bounce={bounce} 
+          isPlaying={isPlaying}
+          bounce={bounce}
         />
       ))}
     </group>

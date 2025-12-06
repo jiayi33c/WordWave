@@ -9,6 +9,7 @@ import { audioService } from '../services/audioService';
 import { elevenLabsService } from '../services/elevenLabsService';
 import { syllableService } from '../services/syllableService';
 import { stepSequencer } from '../services/stepSequencer';
+import { magentaService } from '../services/magentaService';
 import { melodyService, SYNONYM_SEED, ANTONYM_SEED } from '../services/melodyService';
 import * as patternService from '../services/patternService';
 
@@ -61,6 +62,7 @@ export function DropZone({
   const [currentSyllableIndex, setCurrentSyllableIndex] = useState(-1);
   const [preparedWords, setPreparedWords] = useState([]);
   const [loadingMessage, setLoadingMessage] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Config
   const TEMPO = 120;
@@ -120,15 +122,169 @@ export function DropZone({
   }, [phase, onPlaybackStatusChange]);
 
   useEffect(() => {
-    if (isPlaying && phase === PHASES.IDLE && droppedWords.length > 0) {
-      prepareAndPlay();
+    if (isPlaying && phase === PHASES.IDLE) {
+      // If already prepared, play immediately.
+      // If still processing, wait for it (this logic can be improved)
+      if (preparedWords.length === droppedWords.length && !isProcessing) {
+        startPlayback(preparedWords);
+      } else {
+        // Wait or show warning? 
+        // For now, let's assume the button is disabled if not ready
+        // But if isPlaying comes from parent without button click...
+        console.log("Waiting for preparation to finish...");
+      }
     } else if (!isPlaying && phase !== PHASES.IDLE) {
       cleanup();
     }
-  }, [isPlaying, droppedWords]);
+  }, [isPlaying, preparedWords, isProcessing, droppedWords]);
 
   // ───────────────────────────────────────────────────────────────────────────
-  // Instrument selection
+  // Background Preparation Pipeline
+  // ───────────────────────────────────────────────────────────────────────────
+
+  // Whenever droppedWords changes, prepare any new words in the background!
+  useEffect(() => {
+    if (droppedWords.length === 0) {
+      setPreparedWords([]);
+      return;
+    }
+
+    const prepareNewWords = async () => {
+      // Filter words that are already prepared to avoid re-work
+      const existingMap = new Map(preparedWords.map(w => [w.word, w]));
+      const wordsToProcess = droppedWords.filter(w => !existingMap.has(w.text));
+
+      if (wordsToProcess.length === 0) return;
+
+      setIsProcessing(true);
+      setLoadingMessage('Optimizing audio...'); // Less intrusive message
+
+      try {
+        const newPrepared = [...preparedWords];
+
+        for (const wObj of wordsToProcess) {
+          const word = wObj.text;
+          const index = droppedWords.findIndex(dw => dw.text === word);
+
+          // Step 1: Pre-generate voice audio (Text-to-Speech)
+          const ttsData = await elevenLabsService.speak(word);
+
+          // Step 2: Analyze audio for precise syllable timing
+          const syllableData = syllableService.extractSyllableTimestamps(
+            word,
+            ttsData.charStartTimes || [],
+            ttsData.characters || []
+          );
+
+          // Step 3: Generate AI-powered drum patterns
+          let syllableDrumPattern = [];
+          try {
+            if (magentaService.isReady()) {
+              const noteSeq = await magentaService.generateDrumPattern(
+                syllableData.syllableTimestamps, 
+                syllableData.stress, 
+                TEMPO
+              );
+              syllableDrumPattern = magentaService.noteSequenceToToneEvents(noteSeq);
+            }
+          } catch (e) {
+            console.warn('GrooVAE beat generation failed, using fallback', e);
+          }
+
+          if (!syllableDrumPattern || syllableDrumPattern.length === 0) {
+             syllableDrumPattern = generateSyllableDrumPattern(syllableData, word);
+          }
+
+          // Step 4: Generate melody pattern
+          let melody = null;
+          let kidsMelody = null;
+
+          try {
+            if (magentaService.isReady()) {
+              melody = await magentaService.generateMelody(1.0);
+              
+              if (melody) {
+                  kidsMelody = { ...melody, notes: [] };
+                  melody.notes.forEach(n => {
+                      const duration = n.quantizedEndStep - n.quantizedStartStep;
+                      const isLong = duration >= 2; 
+                      
+                      if (isLong) {
+                          kidsMelody.notes.push({
+                              ...n,
+                              pitch: n.pitch + 12,
+                              quantizedEndStep: n.quantizedStartStep + 1,
+                              velocity: 120
+                          });
+                          kidsMelody.notes.push({
+                              ...n,
+                              pitch: n.pitch + 12 + 7, 
+                              quantizedStartStep: n.quantizedStartStep + 1,
+                              quantizedEndStep: n.quantizedEndStep,
+                              velocity: 100
+                          });
+                      } else {
+                          kidsMelody.notes.push({
+                              ...n,
+                              pitch: n.pitch + 12,
+                              velocity: 115
+                          });
+                      }
+                  });
+              }
+            }
+          } catch (e) {
+            console.warn('Magenta melody failed, using fallback', e);
+          }
+
+          if (!melody) {
+             const seed = index % 2 === 0 ? SYNONYM_SEED : ANTONYM_SEED;
+             melody = melodyService.fallbackMelodyGeneration(1.1, seed, TEMPO);
+             kidsMelody = {
+                 ...melody,
+                 notes: melody.notes.map(n => ({ ...n, pitch: n.pitch + 12 }))
+             };
+          }
+
+          // Step 5: Calculate timing
+          const wordDuration = ttsData.duration || 1.5;
+          const beatsPerSecond = TEMPO / 60;
+          const wordBeats = Math.ceil(wordDuration * beatsPerSecond);
+          const loopBeats = wordBeats + 1;
+          const loopDuration = loopBeats / beatsPerSecond;
+
+          newPrepared.push({
+            word,
+            ttsData,
+            syllableData,
+            syllableDrumPattern,
+            melody,
+            kidsMelody,
+            wordDuration,
+            loopDuration,
+          });
+        }
+
+        // Re-order to match droppedWords order
+        const orderedPrepared = droppedWords.map(dw => 
+          newPrepared.find(p => p.word === dw.text)
+        ).filter(Boolean);
+
+        setPreparedWords(orderedPrepared);
+
+      } catch (error) {
+        console.error('Background preparation error:', error);
+      } finally {
+        setIsProcessing(false);
+        setLoadingMessage('');
+      }
+    };
+
+    prepareNewWords();
+  }, [droppedWords]);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Instrument selection & Helpers
   // ───────────────────────────────────────────────────────────────────────────
 
   const getInstrumentPalette = (word) => {
@@ -138,10 +294,6 @@ export function DropZone({
     }
     return INSTRUMENT_PALETTES[Math.abs(hash) % INSTRUMENT_PALETTES.length];
   };
-
-  // ───────────────────────────────────────────────────────────────────────────
-  // Generate drum pattern for syllables
-  // ───────────────────────────────────────────────────────────────────────────
 
   const generateSyllableDrumPattern = (syllableData, word) => {
     const palette = getInstrumentPalette(word);
@@ -170,140 +322,14 @@ export function DropZone({
   };
 
   // ───────────────────────────────────────────────────────────────────────────
-  // Prepare and start playback
-  // ───────────────────────────────────────────────────────────────────────────
-
-  const prepareAndPlay = async () => {
-    setPhase(PHASES.PREPARING);
-    setLoadingMessage('Initializing audio...');
-
-    try {
-      // Step 1: Initialize Web Audio API
-      if (!audioService.isInitialized()) {
-        await audioService.initialize();
-      }
-
-      const prepared = [];
-
-      for (let i = 0; i < droppedWords.length; i++) {
-        const word = droppedWords[i].text;
-        
-        // Step 2: Pre-generate voice audio (Text-to-Speech)
-        setLoadingMessage(`🎤 Generating voice: "${word}"...`);
-        const ttsData = await elevenLabsService.speak(word);
-
-        // Step 3: Analyze audio for precise syllable timing
-        setLoadingMessage(`📊 Analyzing syllables: "${word}"...`);
-        const syllableData = syllableService.extractSyllableTimestamps(
-          word,
-          ttsData.charStartTimes || [],
-          ttsData.characters || []
-        );
-
-        // Step 4: Generate AI-powered drum patterns
-        setLoadingMessage(`🥁 Creating beat pattern: "${word}"...`);
-        let syllableDrumPattern = [];
-
-        try {
-          if (magentaService.isReady()) {
-            // Use GrooVAE to generate a drum beat that matches the rhythm of the words
-            const noteSeq = await magentaService.generateDrumPattern(
-              syllableData.syllableTimestamps, 
-              syllableData.stress, 
-              TEMPO
-            );
-            syllableDrumPattern = magentaService.noteSequenceToToneEvents(noteSeq);
-          }
-        } catch (e) {
-          console.warn('GrooVAE beat generation failed, using fallback', e);
-        }
-
-        // Fallback to algorithmic generation if AI fails or returns empty
-        if (!syllableDrumPattern || syllableDrumPattern.length === 0) {
-           syllableDrumPattern = generateSyllableDrumPattern(syllableData, word);
-        }
-
-        // Step 4b: Generate melody pattern
-        let melody = null;
-        let kidsMelody = null; // New: Fun variation for kids turn!
-
-        try {
-          if (magentaService.isReady()) {
-            setLoadingMessage(`🎹 AI Composing melody: "${word}"...`);
-            melody = await magentaService.generateMelody(1.0); // Balanced Creativity
-            
-            // For Kids Turn: Reuse the SAME melody but transposed up!
-            // This ensures it sounds "nice" (familiar) but energetic.
-            if (melody) {
-                kidsMelody = {
-                    ...melody,
-                    notes: melody.notes.map(n => ({
-                        ...n,
-                        pitch: n.pitch + 12 // Shift up one octave (12 semitones)
-                    }))
-                };
-            }
-          }
-        } catch (e) {
-          console.warn('Magenta melody failed, using fallback', e);
-        }
-
-        if (!melody) {
-           // Fallback if AI fails or not ready
-           const seed = i % 2 === 0 ? SYNONYM_SEED : ANTONYM_SEED;
-           melody = melodyService.fallbackMelodyGeneration(1.1, seed, TEMPO);
-           // Fallback kids melody (octave up)
-           kidsMelody = {
-               ...melody,
-               notes: melody.notes.map(n => ({ ...n, pitch: n.pitch + 12 }))
-           };
-        }
-
-        // Step 5: Calculate timing for millisecond-precision scheduling
-        const wordDuration = ttsData.duration || 1.5;
-        const beatsPerSecond = TEMPO / 60;
-        const wordBeats = Math.ceil(wordDuration * beatsPerSecond);
-        const loopBeats = wordBeats + 1;
-        const loopDuration = loopBeats / beatsPerSecond;
-
-        prepared.push({
-          word,
-          ttsData,
-          syllableData,
-          syllableDrumPattern,
-          melody,
-          kidsMelody, // Store the fun version
-          wordDuration,
-          loopDuration,
-        });
-      }
-
-      // Step 6: Schedule coordinated playback
-      setLoadingMessage('🎵 Scheduling audio...');
-      setPreparedWords(prepared);
-      
-      // Small delay to show final message
-      await new Promise(r => setTimeout(r, 200));
-      setLoadingMessage('');
-      
-      startPlayback(prepared);
-
-    } catch (error) {
-      console.error('Error preparing:', error);
-      setLoadingMessage('Error!');
-      setTimeout(() => {
-        cleanup();
-        if (onStopSing) onStopSing();
-      }, 1500);
-    }
-  };
-
-  // ───────────────────────────────────────────────────────────────────────────
   // Start playback - Play ALL words as a song/phrase
   // ───────────────────────────────────────────────────────────────────────────
 
   const startPlayback = async (prepared) => {
     if (prepared.length === 0) return;
+
+    // Ensure audio context is running (user gesture required for resume)
+    await audioService.initialize();
 
     setPhase(PHASES.PLAYING);
     isPlayingRef.current = true;
@@ -317,11 +343,6 @@ export function DropZone({
     let pattern = null;
     if (backgroundGroove && backgroundGroove.length > 0) {
       pattern = eventsToPattern(backgroundGroove);
-      console.log('🎵 Pattern created:', 
-        'kick:', pattern.kick.filter(x => x).length,
-        'snare:', pattern.snare.filter(x => x).length,
-        'hat:', pattern.hat.filter(x => x).length
-      );
     } else {
       // Fallback pattern
       pattern = {
@@ -329,7 +350,6 @@ export function DropZone({
         snare: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
         hat:   [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
       };
-      console.log('⚠️ Using fallback pattern');
     }
 
     // Start Tone.Transport FIRST (needed for step sequencer)
@@ -339,14 +359,12 @@ export function DropZone({
     // Set pattern and start step sequencer (continuous background beat)
     stepSequencer.setPattern(pattern);
     stepSequencer.start();
-    console.log('✅ Step sequencer started with pattern');
     
     // Play all words as a continuous phrase
     playSongSequence(prepared);
     
     // Start Transport AFTER scheduling to ensure perfect alignment
     Tone.Transport.start();
-    console.log('🎵 Tone.Transport started at', TEMPO, 'BPM');
   };
 
   /**
@@ -361,7 +379,6 @@ export function DropZone({
     };
 
     const sp16 = 60 / TEMPO / 4; // Seconds per 16th note (0.125s at 120 BPM)
-    console.log('Converting events to pattern, sp16:', sp16, 'events:', events.length);
 
     events.forEach(event => {
       // Calculate which step this event falls on
@@ -378,12 +395,6 @@ export function DropZone({
         }
       }
     });
-
-    // Debug: show the pattern
-    console.log('Pattern created:');
-    console.log('  kick: ', pattern.kick.map(x => x ? '█' : '·').join(''));
-    console.log('  snare:', pattern.snare.map(x => x ? '█' : '·').join(''));
-    console.log('  hat:  ', pattern.hat.map(x => x ? '█' : '·').join(''));
 
     return pattern;
   };
@@ -525,8 +536,9 @@ export function DropZone({
           
           const id = Tone.Transport.schedule((time) => {
             if (!isPlayingRef.current) return;
-            // Play slightly louder for kids turn!
-            audioService.triggerMelodyNote(freq, noteDuration, time, (note.velocity / 127) * 0.9);
+            // Play slightly louder AND shorter (Staccato) for vibrant, bouncy feel!
+            // noteDuration * 0.5 makes it punchy
+            audioService.triggerMelodyNote(freq, noteDuration * 0.5, time, (note.velocity / 127) * 1.0);
           }, noteStartTime);
           scheduledIdsRef.current.push(id);
         });
@@ -625,7 +637,10 @@ export function DropZone({
   };
 
   const currentSyllables = getCurrentWordSyllables();
-  const canSing = droppedWords.length > 0 && modelsReady && phase === PHASES.IDLE;
+  
+  // Ready to play if we are not processing AND we have prepared as many words as dropped
+  const isReadyToPlay = !isProcessing && preparedWords.length === droppedWords.length;
+  const canSing = droppedWords.length > 0 && isReadyToPlay && phase === PHASES.IDLE;
 
   // ───────────────────────────────────────────────────────────────────────────
   // Render
@@ -654,17 +669,8 @@ export function DropZone({
         )}
       </div>
 
-      {/* Loading pipeline */}
-      {phase === PHASES.PREPARING && (
-        <div style={styles.loadingBar}>
-          <div style={styles.loadingSpinner} />
-          <div style={styles.loadingContent}>
-            <span style={styles.loadingTitle}>Building your song...</span>
-            <span style={styles.loadingStep}>{loadingMessage}</span>
-          </div>
-        </div>
-      )}
-
+      {/* Loading Bar removed! Replaced by logic to prep in background */}
+      
       {/* Celebration */}
       {phase === PHASES.CELEBRATION && (
         <div style={styles.celebration}>
@@ -727,22 +733,20 @@ export function DropZone({
             ...styles.button,
             background: phase === PHASES.PLAYING
               ? 'linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%)'
-              : !modelsReady
+              : !isReadyToPlay
                 ? 'linear-gradient(135deg, #78909C 0%, #546E7A 100%)'
                 : 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
             boxShadow: phase === PHASES.PLAYING
               ? '0 4px 20px rgba(255, 107, 107, 0.5)'
               : '0 4px 20px rgba(56, 239, 125, 0.5)',
-            opacity: (!canSing && phase !== PHASES.PLAYING) ? 0.6 : 1,
-            cursor: (!canSing && phase !== PHASES.PLAYING) ? 'not-allowed' : 'pointer',
+            opacity: (!canSing && phase !== PHASES.PLAYING) ? 0.7 : 1,
+            cursor: (!canSing && phase !== PHASES.PLAYING) ? 'wait' : 'pointer',
           }}
         >
           {phase === PHASES.PLAYING ? (
             <>⏹ Stop</>
-          ) : phase === PHASES.PREPARING ? (
-            <>⏳ {loadingMessage}</>
-          ) : !modelsReady ? (
-            <>⏳ Loading AI...</>
+          ) : !isReadyToPlay ? (
+            <>⏳ Preparing Music...</>
           ) : (
             <>🎤 Sing Your Words!</>
           )}
@@ -811,40 +815,7 @@ const styles = {
     boxShadow: '0 3px 10px rgba(0,0,0,0.2)',
     animation: 'pulse 1s ease-in-out infinite',
   },
-  loadingBar: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '14px 20px',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    borderRadius: '14px',
-    color: 'white',
-    fontFamily: '"Nunito", sans-serif',
-    marginBottom: '12px',
-    boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
-  },
-  loadingSpinner: {
-    width: '20px',
-    height: '20px',
-    border: '2px solid rgba(255,255,255,0.3)',
-    borderTop: '2px solid white',
-    borderRadius: '50%',
-    animation: 'spin 0.6s linear infinite',
-    flexShrink: 0,
-  },
-  loadingContent: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '2px',
-  },
-  loadingTitle: {
-    fontSize: '14px',
-    fontWeight: 'bold',
-  },
-  loadingStep: {
-    fontSize: '12px',
-    opacity: 0.85,
-  },
+  // Loading bar style removed since we don't use it anymore
   celebration: {
     padding: '20px',
     fontSize: '24px',

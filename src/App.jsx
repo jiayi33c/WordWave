@@ -317,7 +317,8 @@ function Scene({ handPos, isPinching, words, onWordGrab, onWordDrop, onWordClick
   const trainStartTimeRef = useRef(null); // When train started moving
   
   // Access the audio service to get the beat
-  const [bounce, setBounce] = useState(0);
+  // Removed bounce state for performance
+  // const [bounce, setBounce] = useState(0);
   
   // Determine which words to show
   // If playing, show the dropped words (lyrics) in a stage formation
@@ -387,18 +388,7 @@ function Scene({ handPos, isPinching, words, onWordGrab, onWordDrop, onWordClick
   };
   
   useFrame((state, delta) => {
-    // Only animate beat if playing
-    if (!isPlaying) {
-      if (bounce > 0.01) setBounce(b => b * 0.9); // Decay to stop
-    } else {
-      // Simple beat detection based on time (120 BPM = 0.5s per beat)
-      const time = state.clock.getElapsedTime();
-      const beat = Math.sin(time * Math.PI * 4); // 120 BPM * 2 (for up/down)
-      
-      // Smooth bounce value
-      const bounceVal = Math.max(0, beat);
-      setBounce(bounceVal);
-    }
+    // Beat calculation logic moved to individual components for performance!
   });
   
   const recentlyGrabbed = useRef(new Set());
@@ -496,6 +486,8 @@ function Scene({ handPos, isPinching, words, onWordGrab, onWordDrop, onWordClick
   });
   
   useFrame((state, delta) => {
+    const t = state.clock.getElapsedTime(); // Define time variable for groove animations
+
     if (trainRef.current) {
       const loopLength = Math.PI * 2;
 
@@ -544,9 +536,15 @@ function Scene({ handPos, isPinching, words, onWordGrab, onWordDrop, onWordClick
     }
     
     // Camera control
+    // 1. Hand Tracking Control
     // Only move camera if hand detected AND NOT pinching
     // This prevents "shaky screen" while trying to drag words
     // Uses smoothed hand position for smoother camera movement
+    
+    // Groove Factors
+    const grooveBob = isPlaying ? Math.sin(t * 8) * 0.15 : 0; // Vertical bounce
+    const grooveSway = isPlaying ? Math.sin(t * 4) * 0.01 : 0; // Slight tilt
+    
     if (handPos && !isPinching) {
       const targetX = (0.5 - smoothedHandPos.current.x) * 40; 
       const targetY = (smoothedHandPos.current.y) * 15 + 5;   
@@ -554,9 +552,12 @@ function Scene({ handPos, isPinching, words, onWordGrab, onWordDrop, onWordClick
       
       const lerpSpeed = 0.05;
       state.camera.position.x += (targetX - state.camera.position.x) * lerpSpeed;
-      state.camera.position.y += (targetY - state.camera.position.y) * lerpSpeed;
+      state.camera.position.y += (targetY - state.camera.position.y + grooveBob) * lerpSpeed; // Add groove
       state.camera.position.z += (targetZ - state.camera.position.z) * lerpSpeed;
+      
       state.camera.lookAt(0, 6, 0); 
+      // state.camera.rotation.z = grooveSway; // Removed sway to ensure stable interactions
+      
     } else if (!handPos) {
       // Only return to default if hand is NOT detected at all
       // If pinching, we do nothing (hold current view stable)
@@ -566,9 +567,11 @@ function Scene({ handPos, isPinching, words, onWordGrab, onWordDrop, onWordClick
       const lerpSpeed = 0.02;
       
       state.camera.position.x += (defaultX - state.camera.position.x) * lerpSpeed;
-      state.camera.position.y += (defaultY - state.camera.position.y) * lerpSpeed;
+      state.camera.position.y += (defaultY - state.camera.position.y + grooveBob) * lerpSpeed; // Add groove
       state.camera.position.z += (defaultZ - state.camera.position.z) * lerpSpeed;
+      
       state.camera.lookAt(0, 6, 0); 
+      // state.camera.rotation.z = grooveSway; 
     }
     // If pinching (handPos && isPinching), we skip updates to keep camera steady
   });
@@ -583,12 +586,12 @@ function Scene({ handPos, isPinching, words, onWordGrab, onWordDrop, onWordClick
       
       <Track isPlaying={isPlaying} />
       <group>
-        <Train ref={trainRef} bounce={bounce} />
+        <Train ref={trainRef} isPlaying={isPlaying} />
       </group>
       <Station isPlaying={isPlaying} position={[-11.3, 3.0, -7.9]} rotation={[0, 0.6, 0]} />
       {/* Trees closer to track (boundary reduced from 100 to 60) */}
-      <Trees count={10} boundary={60} bounce={bounce} />
-      <Mountains count={2} boundary={140} />
+      <Trees count={10} boundary={60} isPlaying={isPlaying} />
+      <Mountains count={2} boundary={140} isPlaying={isPlaying} />
       
       {/* Adjusted balloons to be visible in the camera frustum (y=14, z=34 view) */}
       {/* Previous positions were [40, 30, -40] and [-40, 35, 40]. Too high/far. */}

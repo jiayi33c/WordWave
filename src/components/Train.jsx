@@ -49,7 +49,7 @@ function Smoke({ position, onPuff }) {
   );
 }
 
-export const Train = forwardRef(({ bounce = 0, ...props }, ref) => {
+export const Train = forwardRef(({ isPlaying = false, ...props }, ref) => {
   const groupRef = useRef();
   const bodyMatRef = useRef();
   const chimneyMatRef = useRef();
@@ -101,24 +101,6 @@ export const Train = forwardRef(({ bounce = 0, ...props }, ref) => {
     };
   }, []);
 
-  // Play sound on beat (bounce peak)
-  useEffect(() => {
-    if (bounce > 0.8 && Date.now() - lastChuuTime.current > 400) {
-        if (Tone.Transport.state === 'started') {
-            const now = Tone.now();
-            
-            // 1. Play Noise Hiss
-            noiseSynthRef.current?.triggerAttackRelease('16n', now);
-            
-            // 2. Play Tonal Chug (Low C Major: C2, E2, G2)
-            // This acts as the harmonic bass/rhythm
-            chugSynthRef.current?.triggerAttackRelease(["C2", "G2"], "16n", now);
-            
-            lastChuuTime.current = Date.now();
-        }
-    }
-  }, [bounce]);
-
   // Whistle Trigger
   const playWhistle = () => {
       try {
@@ -145,6 +127,23 @@ export const Train = forwardRef(({ bounce = 0, ...props }, ref) => {
   useFrame((state) => {
     const time = state.clock.elapsedTime;
     
+    // Calculate local bounce here for performance
+    // 120 BPM = 2 beats/sec = 2 Hz. Sin(t * PI * 4) gives 2 peaks per sec
+    const beat = Math.sin(time * Math.PI * 4);
+    const bounce = isPlaying ? Math.max(0, beat) : 0;
+    
+    // Audio Trigger Logic (Check peak inside frame loop)
+    if (bounce > 0.8 && Date.now() - lastChuuTime.current > 400) {
+        if (Tone.Transport.state === 'started') {
+            const now = Tone.now();
+            try {
+                noiseSynthRef.current?.triggerAttackRelease('16n', now);
+                chugSynthRef.current?.triggerAttackRelease(["C2", "G2"], "16n", now);
+            } catch (e) { console.warn(e); }
+            lastChuuTime.current = Date.now();
+        }
+    }
+
     if (groupRef.current) {
       // Squash and stretch
       const stretch = 1 + (bounce * 0.15);
@@ -197,7 +196,7 @@ export const Train = forwardRef(({ bounce = 0, ...props }, ref) => {
         </mesh>
         
         {/* Smoke Particles (attached to chimney) */}
-        {bounce > 0.01 && (
+        {isPlaying && (
             <group position={[0, 2.5, -1]}>
                 <Smoke position={[0, 0, 0]} onPuff={playWhistle} />
                 <Smoke position={[0.1, -0.2, 0.1]} />
