@@ -1074,66 +1074,70 @@ function App() {
         />
       </Canvas>
       
-      {/* Word Sky Input */}
-      {!isPlaying && ( // Hide when playing
+      {/* WordWave Input - Floating Aesthetic */}
+      {!isPlaying && ( 
       <div style={{
         position: 'absolute',
-        top: 20,
-        left: 20,
+        top: 30,
+        left: 30,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'flex-start',
-        gap: '8px',
-        pointerEvents: 'auto' 
+        gap: '12px',
+        pointerEvents: 'auto',
+        zIndex: 50
       }}>
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.9)',
-          padding: '12px 20px',
-          borderRadius: '25px', // Soft cloud shape
-          // border: '4px solid #4FC3F7', // Removed hard border
-          backdropFilter: 'blur(10px)',
-          textAlign: 'left',
-          boxShadow: '0 8px 32px rgba(31, 38, 135, 0.15)', // Glassmorphism shadow
-          border: '1px solid rgba(255, 255, 255, 0.18)',
-          minWidth: '180px'
+        {/* Title Text - Free floating with cartoon style */}
+        <h1 style={{ 
+          margin: 0, 
+          color: '#29B6F6', 
+          fontSize: '42px', 
+          fontFamily: '"Nunito", "Comic Sans MS", sans-serif',
+          fontWeight: '900',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          // Cartoon text effect
+          textShadow: '3px 3px 0px white, 0 4px 12px rgba(0,0,0,0.1)',
+          letterSpacing: '-1px'
         }}>
-          <h2 style={{ 
-            margin: '0 0 8px 0', 
-            color: '#FF9800', 
-            fontSize: '20px', 
-            fontFamily: '"Nunito", sans-serif',
-            fontWeight: '800',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            textShadow: '0 2px 4px rgba(0,0,0,0.1)'
-          }}>
-            <span>🌤️</span> Word Sky
-          </h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '14px', fontWeight: '700', color: '#90A4AE' }}>Topic</span>
-            <input 
-              type="text" 
-              value={topic} 
-              onChange={(e) => setTopic(e.target.value)}
-              style={{
-                border: 'none', // No border
-                borderRadius: '12px',
-                padding: '6px 12px',
-                fontFamily: 'inherit',
-                fontSize: '15px',
-                color: '#546E7A',
-                outline: 'none',
-                width: '110px',
-                background: '#F0F4C3', // Soft yellow/green background
-                fontWeight: 'bold',
-                boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)', // Subtle inner shadow
-                transition: 'all 0.2s ease'
-              }}
-              onFocus={(e) => e.target.style.background = '#FFF9C4'}
-              onBlur={(e) => e.target.style.background = '#F0F4C3'}
-            />
-          </div>
+          WordWave 🌊
+        </h1>
+
+        {/* Topic Input - Subtle floating pill */}
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '10px',
+          background: 'rgba(255, 255, 255, 0.6)', // More transparent
+          backdropFilter: 'blur(12px)',
+          padding: '8px 16px',
+          borderRadius: '100px', // Fully round pill
+          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+          border: '1px solid rgba(255, 255, 255, 0.4)'
+        }}>
+          <span style={{ fontSize: '16px', fontWeight: '800', color: '#78909C' }}>Topic:</span>
+          <input 
+            type="text" 
+            value={topic} 
+            onChange={(e) => setTopic(e.target.value)}
+            style={{
+              border: 'none', 
+              borderRadius: '20px',
+              padding: '8px 16px',
+              fontFamily: 'inherit',
+              fontSize: '16px',
+              color: '#455A64',
+              outline: 'none',
+              width: '140px',
+              background: 'white',
+              fontWeight: 'bold',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
+              transition: 'all 0.2s ease'
+            }}
+            onFocus={(e) => e.target.style.transform = 'scale(1.02)'}
+            onBlur={(e) => e.target.style.transform = 'scale(1)'}
+          />
         </div>
       </div>
       )}
