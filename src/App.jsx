@@ -16,6 +16,7 @@ import { fetchRelatedWords } from './utils/wordApi';
 import { audioService } from './services/audioService'; // Import audioService
 import * as patternService from './services/patternService';
 import { magentaService } from './services/magentaService';
+import VoiceAgent from './components/VoiceAgent';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Dynamic Beat Generator - Step Sequencer Style
@@ -1010,6 +1011,15 @@ function App() {
         onPlaybackStatusChange={handlePlaybackStatusChange}
         onMusicDurationCalculated={handleMusicDurationCalculated}
         onWordActive={handleWordActive}
+      />
+
+      {/* ElevenLabs Voice Agent (bottom-right) */}
+      <VoiceAgent 
+        droppedWords={droppedWords}
+        topic={topic}
+        isPlaying={isActuallyPlaying}
+        onSing={handleSing}
+        onClearLyrics={() => setDroppedWords([])}
       />
       
       {/* Camera toggle button */}

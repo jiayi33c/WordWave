@@ -18,7 +18,7 @@ export const ttsWithTimestamps = action({
       throw new Error("ELEVENLABS_API_KEY is not set in Convex environment.");
     }
 
-    const voiceId = args.voiceId || "21m00Tcm4TlvDq8ikWAM"; // default (Rachel)
+    const voiceId = args.voiceId || "ocZQ262SsZb9RIxcQBOj"; 
     const modelId = args.modelId || "eleven_turbo_v2_5";
 
     const body = {
