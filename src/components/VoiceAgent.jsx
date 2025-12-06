@@ -238,6 +238,7 @@ export default function VoiceAgent({
   const [isListeningForWakeWord, setIsListeningForWakeWord] = useState(true);
   const [wakeWordStatus, setWakeWordStatus] = useState("inactive"); // inactive, listening, error
   const [lastHeard, setLastHeard] = useState(""); // Debug: show what it hears
+  const [isVisible, setIsVisible] = useState(false); // Control agent visibility
   const wakeWordRecognitionRef = useRef(null);
 
   const addTranscript = useCallback((speaker, message, isAgent = false) => {
@@ -374,6 +375,7 @@ You can use these tools:
             const lowerText = text.toLowerCase();
             if (lowerText.includes("bye") || lowerText.includes("goodbye") || lowerText.includes("see you")) {
                setTimeout(() => {
+                 setIsVisible(false); // Hide agent on bye!
                  endConversation();
                }, 2000); // Delay slightly to let the agent say goodbye if it wants (or just cut it)
             }
@@ -448,6 +450,7 @@ You can use these tools:
         ];
         
         if (variations.some(v => transcript.includes(v))) {
+          setIsVisible(true); // Show agent on wake word!
           if (isConnectedRef.current) {
              console.log("⚠️ Wake word detected but already connected.");
              return;
@@ -557,22 +560,32 @@ You can use these tools:
 
   return (
     <div style={{ position: "fixed", bottom: 20, right: 250, zIndex: 1000, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-      {/* Click avatar to manually wake up */}
+      {/* Avatar - Control visibility */}
       <div 
-        onClick={() => {
-          if (!isConnected && !isConnecting) {
-            startConversation();
-          }
+        style={{ 
+          opacity: isVisible ? 1 : 0, 
+          transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
+          transition: 'all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+          pointerEvents: isVisible ? 'auto' : 'none'
         }}
-        style={{ cursor: !isConnected ? 'pointer' : 'default' }}
-        title="Click to talk!"
       >
-        <Instructor speaking={isSpeaking} singing={false} />
+        {/* Click avatar to manually wake up (if visible) */}
+        <div 
+          onClick={() => {
+            if (!isConnected && !isConnecting) {
+              startConversation();
+            }
+          }}
+          style={{ cursor: !isConnected ? 'pointer' : 'default' }}
+          title="Click to talk!"
+        >
+          <Instructor speaking={isSpeaking} singing={false} />
+        </div>
       </div>
       
-      {/* Wake Word Status - Simplified (No Bye Button) */}
+      {/* Wake Word Status - Hide when listening to be "magic", show if error/inactive */}
       <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center", justifyContent: "center" }}>
-        {!isConnected && (
+        {!isConnected && wakeWordStatus !== 'listening' && (
           <div 
             onClick={() => {
                // Manual start on click to bypass browser autoplay policies
@@ -591,7 +604,7 @@ You can use these tools:
               display: "flex",
               alignItems: "center",
               gap: 6,
-              cursor: wakeWordStatus !== 'listening' ? 'pointer' : 'default',
+              cursor: 'pointer',
               border: wakeWordStatus === 'permission-denied' ? '2px solid #ff6b6b' : 'none',
               whiteSpace: 'nowrap'
             }}
@@ -599,14 +612,10 @@ You can use these tools:
             {/* Status Dot */}
             <div style={{
               width: 6, height: 6, borderRadius: "50%",
-              background: wakeWordStatus === 'listening' ? '#4CAF50' : (wakeWordStatus === 'error' || wakeWordStatus === 'permission-denied' ? '#F44336' : '#9E9E9E'),
-              boxShadow: wakeWordStatus === 'listening' ? '0 0 6px #4CAF50' : 'none',
-              animation: wakeWordStatus === 'listening' ? 'pulse 1.5s infinite' : 'none'
+              background: (wakeWordStatus === 'error' || wakeWordStatus === 'permission-denied' ? '#F44336' : '#9E9E9E'),
             }} />
             
-            {wakeWordStatus === 'listening' ? (
-               lastHeard ? `👂 "${lastHeard}"` : 'Say "Hey Lulu" 🎙️'
-            ) : wakeWordStatus === 'permission-denied' ? (
+            {wakeWordStatus === 'permission-denied' ? (
                'Tap to Enable Mic ⚠️'
             ) : (
                'Tap to Start Listening 🎙️'
@@ -615,10 +624,10 @@ You can use these tools:
         )}
       </div>
 
-      {/* Status Text Overlay (Connecting/Thinking) */}
+      {/* Status Text Overlay (Connecting/Thinking) - Only if visible */}
       <div style={{
         position: "absolute",
-        bottom: 60, // Positioned over avatar body if needed, or we can remove if redundant
+        bottom: 60,
         left: "50%",
         transform: "translateX(-50%)",
         background: "rgba(255,255,255,0.95)",
@@ -629,7 +638,7 @@ You can use these tools:
         boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
         minWidth: 100,
         textAlign: "center",
-        opacity: (isConnecting || (isConnected && !isSpeaking && !isListening)) ? 1 : 0, 
+        opacity: (isVisible && (isConnecting || (isConnected && !isSpeaking && !isListening))) ? 1 : 0, 
         pointerEvents: "none",
         transition: "opacity 0.3s ease",
         zIndex: 1001
@@ -638,8 +647,8 @@ You can use these tools:
         {isConnected && !isSpeaking && !isListening && "💭 Thinking..."}
       </div>
 
-      {/* Transcript - Speech Bubbles */}
-      {transcript.length > 0 && (
+      {/* Transcript - Speech Bubbles - Only if visible */}
+      {isVisible && transcript.length > 0 && (
         <div style={{
           position: "absolute",
           bottom: 350, // Moved up above the avatar

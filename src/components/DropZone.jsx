@@ -716,6 +716,7 @@ export function DropZone({
                     ...styles.word,
                     ...(isPast ? styles.wordPast : {}),
                     ...(isFuture ? styles.wordFuture : {}),
+                    animationDelay: `${i * 0.2}s`, // Random float offset
                   }}
                 >
                   {word.text}
@@ -856,18 +857,19 @@ const styles = {
     alignItems: 'center',
   },
   word: {
-    padding: '10px 24px',
-    borderRadius: '30px', // Pill shape
-    fontSize: '20px',
-    fontWeight: 'bold',
-    fontFamily: '"Nunito", sans-serif',
+    padding: '12px 24px',
+    borderRadius: '50px', // Super round bubble
+    fontSize: '22px',
+    fontWeight: '800',
+    fontFamily: '"Nunito", "Comic Sans MS", sans-serif',
     // Fun, floaty style
-    background: 'white',
-    color: '#455A64',
-    boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
-    border: '3px solid #B3E5FC', // Light blue border
-    transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)', // Bouncy transition
+    background: 'linear-gradient(to bottom, #FFFFFF, #F5F7FA)',
+    color: '#5C6BC0',
+    boxShadow: '0 10px 20px rgba(92, 107, 192, 0.15), 0 4px 0 #E8EAF6', // Soft 3D lift
+    border: '3px solid #E8EAF6', 
+    transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)', 
     cursor: 'default',
+    animation: 'float 3s ease-in-out infinite', // Floating animation
   },
   wordPast: {
     opacity: 0.6,
