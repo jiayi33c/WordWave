@@ -6,9 +6,9 @@ export function Trees({ count = 50, boundary = 100 }) {
     for (let i = 0; i < count; i++) {
       const x = (Math.random() - 0.5) * boundary * 2;
       const z = (Math.random() - 0.5) * boundary * 2;
-      // Avoid center track area (width 10)
-      if (Math.abs(x) < 8) continue; 
-      temp.push({ pos: [x, 0, z], scale: 0.5 + Math.random() * 0.5 });
+      // Avoid center track area
+      if (Math.sqrt(x*x + z*z) < 30) continue; 
+      temp.push({ pos: [x, 0, z], scale: 0.8 + Math.random() * 0.6 });
     }
     return temp;
   }, [count, boundary]);
@@ -18,22 +18,29 @@ export function Trees({ count = 50, boundary = 100 }) {
       {trees.map((t, i) => (
         <group key={i} position={t.pos} scale={[t.scale, t.scale, t.scale]}>
           {/* Trunk */}
-          <mesh position={[0, 1, 0]}>
-             <cylinderGeometry args={[0.4, 0.6, 2]} />
-             <meshStandardMaterial color="#5D4037" />
+          <mesh position={[0, 0.8, 0]}>
+             <cylinderGeometry args={[0.3, 0.4, 1.6]} />
+             <meshStandardMaterial color="#8D6E63" />
           </mesh>
-          {/* Leaves */}
-          <mesh position={[0, 3, 0]}>
-            <coneGeometry args={[1.5, 4, 8]} />
-            <meshStandardMaterial color="#2E7D32" />
+          {/* Leaves - Spherical/Bubble style */}
+          <mesh position={[0, 2.2, 0]}>
+            <sphereGeometry args={[1.2, 16, 16]} />
+            <meshStandardMaterial color="#66BB6A" />
           </mesh>
-          <mesh position={[0, 4.5, 0]}>
-            <coneGeometry args={[1.2, 3.5, 8]} />
-            <meshStandardMaterial color="#388E3C" />
+          <mesh position={[0.8, 1.8, 0]} scale={0.7}>
+            <sphereGeometry args={[1, 16, 16]} />
+            <meshStandardMaterial color="#81C784" />
+          </mesh>
+          <mesh position={[-0.8, 1.8, 0]} scale={0.7}>
+             <sphereGeometry args={[1, 16, 16]} />
+             <meshStandardMaterial color="#4CAF50" />
+          </mesh>
+          <mesh position={[0, 2.8, 0]} scale={0.8}>
+             <sphereGeometry args={[1, 16, 16]} />
+             <meshStandardMaterial color="#A5D6A7" />
           </mesh>
         </group>
       ))}
     </group>
   );
 }
-
