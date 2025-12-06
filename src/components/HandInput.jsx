@@ -117,68 +117,79 @@ const HandInput = ({ onHandMove, onPinch }) => {
       canvasCtx.translate(canvasRef.current.width, 0);
       canvasCtx.scale(-1, 1); // Mirror for drawing
 
+      // --- DRAW CAMERA FEED PREVIEW ---
+      // Draw a small preview of the camera feed in the top-right corner
+      // Since we are mirrored with scale(-1, 1) and translated to (width, 0),
+      // drawing at (0,0) will place it at the top-RIGHT of the screen visually.
+      if (results.image) {
+        canvasCtx.save();
+        // Flip the image back so the preview looks like a mirror (standard for webcam)
+        // Wait, the context is already flipped. If we draw the image normally, it will appear flipped (mirrored).
+        // This is what we want for a "mirror" view.
+        
+        // Position: Top Right (0,0 in this coordinate system)
+        const previewW = videoWidth * 0.2; // 20% size
+        const previewH = videoHeight * 0.2;
+        const margin = 20;
+        
+        // Add a white border/background
+        canvasCtx.fillStyle = 'white';
+        canvasCtx.fillRect(margin - 5, margin - 5, previewW + 10, previewH + 10);
+        
+        // Draw the video frame
+        canvasCtx.drawImage(results.image, margin, margin, previewW, previewH);
+        
+        // Add "Camera" label
+        canvasCtx.scale(-1, 1); // Un-mirror text
+        canvasCtx.fillStyle = '#333';
+        canvasCtx.font = '12px Arial';
+        // Calculate text position. We un-mirrored, so X is negative.
+        // The box is at +margin. 
+        // -margin - previewW/2 = center of box
+        canvasCtx.fillText("Camera", -margin - previewW + 5, margin + previewH + 20);
+        canvasCtx.restore();
+      }
+
       if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
         const landmarks = results.multiHandLandmarks[0];
         
-        // Landmark 8: Index Finger Tip
-        // Landmark 4: Thumb Tip
-        // Landmark 0: Wrist
-        // Landmark 9: Middle finger base (palm center-ish)
         const indexTip = landmarks[8];
         const thumbTip = landmarks[4];
-        const palmCenter = landmarks[9]; // Use middle finger base as reference
+        const palmCenter = landmarks[9]; 
         
-        // Calculate distance for pinch detection
         const distance = Math.sqrt(
           Math.pow(indexTip.x - thumbTip.x, 2) + Math.pow(indexTip.y - thumbTip.y, 2)
         );
         
-        // Threshold for pinch
-        // 0.1 provides a tighter, more precise pinch feel
         const isPinching = distance < 0.1;
         
-        // Smooth the duck position
         const smoothFactor = 0.2;
         smoothedPos.current.x += (palmCenter.x - smoothedPos.current.x) * smoothFactor;
         smoothedPos.current.y += (palmCenter.y - smoothedPos.current.y) * smoothFactor;
         
-        // Calculate bill open amount (0 = closed, 1 = open)
-        // Sync with isPinching: closed at 0.1, fully open at 0.25
         const billOpenAmount = Math.max(0, Math.min(1, (distance - 0.1) / 0.15));
         
-        // Draw the duck at the smoothed palm position
         const duckX = smoothedPos.current.x * videoWidth;
         const duckY = smoothedPos.current.y * videoHeight;
-        const duckSize = Math.min(videoWidth, videoHeight) * 0.08; // Size based on screen
+        const duckSize = Math.min(videoWidth, videoHeight) * 0.08; 
         
-        // Determine if duck should face left based on hand orientation
         const facingLeft = thumbTip.x > indexTip.x;
         
-        // Calculate Bill Tip Position relative to palm center
-        // Duck is drawn at smoothedPos.current (palm center)
-        // Bill tip offset depends on size (s) and facing direction
-        // s = duckSize * 0.8
         const s = duckSize * 0.8;
-        // Bill starts at s * 1.4 from center, length ~0.6s -> tip at ~2.0s
-        // Let's verify drawDuck: translate(s * 1.4, ...) lineTo(s * 0.6, ...) -> s*2.0 total from center
         const billOffsetX = (facingLeft ? -1 : 1) * (s * 2.0);
-        const billOffsetY = -s * 0.5; // Rough height of bill
+        const billOffsetY = -s * 0.5; 
         
-        // The duck visual position (Video Pixel Coords)
         const visualDuckX = smoothedPos.current.x * videoWidth;
         const visualDuckY = smoothedPos.current.y * videoHeight;
         
-        // The actual Bill Tip position (Video Pixel Coords)
         const billTipX = visualDuckX + billOffsetX;
         const billTipY = visualDuckY + billOffsetY;
         
-        // Normalize Bill Tip to 0-1 of Video Dimensions
         const billTipNormalizedX = billTipX / videoWidth;
         const billTipNormalizedY = billTipY / videoHeight;
 
         drawDuck(canvasCtx, visualDuckX, visualDuckY, duckSize, billOpenAmount, facingLeft);
         
-        // Add speech bubble when pinching (grabbing)
         if (isPinching) {
           canvasCtx.fillStyle = 'white';
           canvasCtx.strokeStyle = '#333';
@@ -190,9 +201,8 @@ const HandInput = ({ onHandMove, onPinch }) => {
           canvasCtx.fill();
           canvasCtx.stroke();
           
-          // "Quack!" text
           canvasCtx.save();
-          canvasCtx.scale(-1, 1); // Unmirror for text
+          canvasCtx.scale(-1, 1); 
           canvasCtx.fillStyle = '#FF6F00';
           canvasCtx.font = `bold ${duckSize * 0.4}px Comic Sans MS, sans-serif`;
           canvasCtx.textAlign = 'center';
@@ -200,8 +210,6 @@ const HandInput = ({ onHandMove, onPinch }) => {
           canvasCtx.restore();
         }
 
-        // Calculate adjusted coordinates for object-fit: cover
-        // The video is cropped to fit the screen aspect ratio
         const videoAspect = videoWidth / videoHeight;
         const screenW = window.innerWidth;
         const screenH = window.innerHeight;
@@ -210,40 +218,28 @@ const HandInput = ({ onHandMove, onPinch }) => {
         let scale, offsetX, offsetY;
         
         if (screenAspect > videoAspect) {
-          // Screen is wider -> Video is cropped top/bottom
-          // Width fits perfectly (scaled up), Height overflows
           scale = screenW / videoWidth;
           const displayedHeight = videoHeight * scale;
           offsetX = 0;
-          offsetY = (screenH - displayedHeight) / 2; // Negative value
+          offsetY = (screenH - displayedHeight) / 2; 
         } else {
-          // Screen is taller -> Video is cropped left/right
-          // Height fits perfectly (scaled up), Width overflows
           scale = screenH / videoHeight;
           const displayedWidth = videoWidth * scale;
-          offsetX = (screenW - displayedWidth) / 2; // Negative value
+          offsetX = (screenW - displayedWidth) / 2; 
           offsetY = 0;
         }
         
-        // Raw pixel coordinates on the canvas (video resolution)
-        // MIRROR the rawX because the video and canvas are mirrored
-        // Visual duck is drawn mirrored, so rawX=0 (video left) should be treated as Right
-        // Use billTipNormalizedX instead of smoothedPos.current.x
         const mirroredX = videoWidth - (billTipNormalizedX * videoWidth);
         
         const rawX = mirroredX;
         const rawY = billTipNormalizedY * videoHeight;
         
-        // Convert to Screen Pixel Coordinates
-        // Apply scale and offset
         const screenX = rawX * scale + offsetX;
         const screenY = rawY * scale + offsetY;
         
-        // Normalize to 0-1 of Screen Dimensions
         const normalizedScreenX = screenX / screenW;
         const normalizedScreenY = screenY / screenH;
 
-        // Send CORRECTED data up
         onHandMove({ x: normalizedScreenX, y: normalizedScreenY });
         onPinch(isPinching);
         
@@ -271,34 +267,14 @@ const HandInput = ({ onHandMove, onPinch }) => {
 
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1000, pointerEvents: 'none' }}>
-      {/* Small camera feed in corner */}
-      <div style={{
-        position: 'absolute',
-        top: 20,
-        right: 20,
-        width: '160px',
-        height: '120px',
-        borderRadius: '10px',
-        overflow: 'hidden',
-        border: '3px solid white',
-        boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
-        zIndex: 1001,
-      }}>
-         <Webcam
-          ref={webcamRef}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
-          mirrored={false} // We mirror with transform to avoid React webcam prop confusion with internal canvas
-          videoConstraints={{ width: 320, height: 240 }} // Lower res for small preview
-        />
-      </div>
-
-      {/* Full screen invisible webcam for tracking logic */}
       <div style={{ 
         position: 'relative',
         width: '100%',
         height: '100%',
       }}>
+        {/* ONE Webcam, opacity 0. Used for tracking + source for canvas preview */}
         <Webcam
+          ref={webcamRef}
           style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0 }}
           mirrored={true}
           videoConstraints={{ width: 1280, height: 720 }}
