@@ -1074,6 +1074,8 @@ function App() {
         />
       </Canvas>
       
+      {/* Word Sky Input */}
+      {!isPlaying && ( // Hide when playing
       <div style={{
         position: 'absolute',
         top: 20,
@@ -1081,51 +1083,60 @@ function App() {
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'flex-start',
-        gap: '10px',
+        gap: '8px',
         pointerEvents: 'auto' 
       }}>
         <div style={{
-          background: 'rgba(255, 255, 255, 0.95)',
-          padding: '15px 25px',
-          borderRadius: '30px', // Cloud-like roundness
-          border: '4px solid #4FC3F7', // Sky blue border
+          background: 'rgba(255, 255, 255, 0.9)',
+          padding: '12px 20px',
+          borderRadius: '25px', // Soft cloud shape
+          // border: '4px solid #4FC3F7', // Removed hard border
+          backdropFilter: 'blur(10px)',
           textAlign: 'left',
-          boxShadow: '0 8px 20px rgba(79, 195, 247, 0.3)',
-          minWidth: '200px'
+          boxShadow: '0 8px 32px rgba(31, 38, 135, 0.15)', // Glassmorphism shadow
+          border: '1px solid rgba(255, 255, 255, 0.18)',
+          minWidth: '180px'
         }}>
           <h2 style={{ 
-            margin: '0 0 10px 0', 
+            margin: '0 0 8px 0', 
             color: '#FF9800', 
-            fontSize: '22px', 
-            fontFamily: '"Nunito", sans-serif', // Cute rounded font
+            fontSize: '20px', 
+            fontFamily: '"Nunito", sans-serif',
+            fontWeight: '800',
             display: 'flex',
             alignItems: 'center',
-            gap: '8px'
+            gap: '8px',
+            textShadow: '0 2px 4px rgba(0,0,0,0.1)'
           }}>
-            <span>🌈</span> Word Sky
+            <span>🌤️</span> Word Sky
           </h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#78909C' }}>Topic:</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '14px', fontWeight: '700', color: '#90A4AE' }}>Topic</span>
             <input 
               type="text" 
               value={topic} 
               onChange={(e) => setTopic(e.target.value)}
               style={{
-                border: '2px solid #B3E5FC',
-                borderRadius: '15px',
-                padding: '8px 15px',
+                border: 'none', // No border
+                borderRadius: '12px',
+                padding: '6px 12px',
                 fontFamily: 'inherit',
-                fontSize: '16px',
+                fontSize: '15px',
                 color: '#546E7A',
                 outline: 'none',
-                width: '120px',
-                background: '#E1F5FE',
-                fontWeight: 'bold'
+                width: '110px',
+                background: '#F0F4C3', // Soft yellow/green background
+                fontWeight: 'bold',
+                boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)', // Subtle inner shadow
+                transition: 'all 0.2s ease'
               }}
+              onFocus={(e) => e.target.style.background = '#FFF9C4'}
+              onBlur={(e) => e.target.style.background = '#F0F4C3'}
             />
           </div>
         </div>
       </div>
+      )}
       
       <DropZone
         droppedWords={droppedWords}
