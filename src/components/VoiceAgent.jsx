@@ -1,8 +1,3 @@
-/**
- * VoiceAgent - ElevenLabs conversational agent with animated instructor model
- * Agent ID: agent_0601ka0b4fqgevf91eesshqnk5fn
- */
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, useSpring, useTransform, useMotionValue } from 'framer-motion';
 import { Conversation } from '@elevenlabs/client';
@@ -630,8 +625,7 @@ You can use these tools:
         {!isConnected && (wakeWordStatus === 'error' || wakeWordStatus === 'permission-denied') && (
           <div 
             onClick={() => {
-               // Manual start on click to bypass browser autoplay policies
-               if (wakeWordStatus !== 'listening' && status === 'disconnected') {
+               if (status === 'disconnected') {
                  startWakeWordListener();
                }
             }}
@@ -647,22 +641,18 @@ You can use these tools:
               alignItems: "center",
               gap: 6,
               cursor: 'pointer',
-              border: wakeWordStatus === 'listening' ? '2px solid #4CAF50' : (wakeWordStatus === 'permission-denied' ? '2px solid #ff6b6b' : '2px solid #FF9800'),
+              border: '2px solid #ff6b6b',
               whiteSpace: 'nowrap',
-              opacity: isVisible ? 1 : 0.9,
-              transform: 'scale(1.05)'
+              opacity: 1
             }}
           >
             {/* Status Dot */}
             <div style={{
               width: 8, height: 8, borderRadius: "50%",
-              background: (wakeWordStatus === 'listening' ? '#4CAF50' : wakeWordStatus === 'error' || wakeWordStatus === 'permission-denied' ? '#F44336' : '#FF9800'),
-              animation: wakeWordStatus === 'listening' ? 'pulse 2s infinite' : 'none'
+              background: '#F44336',
             }} />
             
-            {wakeWordStatus === 'listening' ? 'Listening for "Hey Lulu"...' : 
-             wakeWordStatus === 'permission-denied' ? 'Tap to Enable Mic ⚠️' : 
-             'Tap to Activate Lulu 🎙️'}
+            {wakeWordStatus === 'permission-denied' ? 'Tap to Enable Mic ⚠️' : 'Mic Error - Tap to Retry 🔴'}
           </div>
         )}
       </div>
