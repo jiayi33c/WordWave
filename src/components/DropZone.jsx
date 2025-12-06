@@ -438,8 +438,15 @@ export function DropZone({
         }
       });
 
-      // Schedule syllable beats - INSTANT attack!
-      const beatDelay = 0.05; // Almost instant!
+      // 🥁 BIG BEAT at start of each word for sync!
+      scheduleEvent(wordStartTime, () => {
+        if (!isPlayingRef.current) return;
+        audioService.triggerDrum('kick', 1.0);
+        audioService.triggerDrum('snare', 0.7);
+      });
+
+      // Schedule syllable beats
+      const beatDelay = 0.05;
       wordData.syllableDrumPattern.forEach((event, sIdx) => {
         const eventTime = wordStartTime + beatDelay + event.time;
 
@@ -488,6 +495,8 @@ export function DropZone({
       setLoopCount(2);
     });
 
+    // YOUR TURN phase - give more time for kids to repeat!
+    const yourTurnExtraPadding = 0.5; // Extra half second per word
     wordOffset = 0;
     prepared.forEach((wordData, wordIdx) => {
       const wordStartTime = yourTurnStart + wordOffset;
@@ -503,9 +512,16 @@ export function DropZone({
         }
       });
 
+      // 🥁 BIG BEAT at start of each word for sync!
+      scheduleEvent(wordStartTime, () => {
+        if (!isPlayingRef.current) return;
+        audioService.triggerDrum('kick', 1.0);
+        audioService.triggerDrum('snare', 0.7);
+      });
+
       // Schedule syllable beats (NO voice this time!)
       // QUANTIZED for TIGHT musical feel in the "Your Turn" phase
-      const beatDelay2 = 0.05; // Almost instant!
+      const beatDelay2 = 0.15; // Slightly slower for YOUR TURN
       wordData.syllableDrumPattern.forEach((event, sIdx) => {
         // Quantize relative time to nearest 16th note for tight groove
         const quantizationGrid = 60 / TEMPO / 4;
@@ -541,14 +557,16 @@ export function DropZone({
         });
       }
 
-      wordOffset += wordData.loopDuration;
+      wordOffset += wordData.loopDuration + yourTurnExtraPadding;
     });
 
     // ═══════════════════════════════════════════════════════════════════════
     // Schedule finish after both phases complete
     // ═══════════════════════════════════════════════════════════════════════
     
-    const totalDuration = (phraseDuration * 2) + GAP_BETWEEN_PHASES;
+    // YOUR TURN phase is longer due to extra padding
+    const yourTurnDuration = prepared.reduce((sum, w) => sum + w.loopDuration + yourTurnExtraPadding, 0);
+    const totalDuration = phraseDuration + GAP_BETWEEN_PHASES + yourTurnDuration;
     
     // Report duration to parent so train can sync
     if (onMusicDurationCalculated) {
