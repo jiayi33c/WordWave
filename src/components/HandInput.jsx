@@ -3,7 +3,7 @@ import Webcam from 'react-webcam';
 import { Hands } from '@mediapipe/hands';
 import { Camera } from '@mediapipe/camera_utils';
 
-// Draw a SUPER CUTE Kawaii Duck! 🦆✨
+// Draw a cute cartoon duck!
 function drawDuck(ctx, x, y, size, billOpenAmount, facingLeft = false) {
   ctx.save();
   ctx.translate(x, y);
@@ -11,91 +11,76 @@ function drawDuck(ctx, x, y, size, billOpenAmount, facingLeft = false) {
     ctx.scale(-1, 1);
   }
   
-  const s = size * 0.9; // Base scale
-
-  // 1. Little Hair Tuft (Draw first so it's behind outline if needed, or on top)
+  const s = size * 0.8; // Make it much smaller (was 1.2, now 0.8)
+  
+  // -- Feet (orange) --
+  ctx.fillStyle = '#FF9800';
   ctx.beginPath();
-  ctx.moveTo(0, -s * 0.7);
-  ctx.quadraticCurveTo(-s * 0.2, -s * 1.1, 0, -s * 0.9);
-  ctx.quadraticCurveTo(s * 0.2, -s * 1.1, 0, -s * 0.7);
+  ctx.ellipse(0, s * 0.6, s * 0.3, s * 0.15, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // -- Body (Fluffy Yellow Circle) --
+  ctx.fillStyle = '#FFEB3B'; // Brighter yellow
+  ctx.beginPath();
+  ctx.arc(0, 0, s * 0.7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#FBC02D';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+  
+  // -- Wing (Cute little flap) --
   ctx.fillStyle = '#FDD835';
-  ctx.fill();
-  ctx.strokeStyle = '#F9A825';
-  ctx.lineWidth = s * 0.06;
-  ctx.stroke();
-
-  // 2. Head (Round & Fluffy)
-  ctx.fillStyle = '#FDD835'; // Warm Ducky Yellow
   ctx.beginPath();
-  ctx.arc(0, 0, s * 0.75, 0, Math.PI * 2); 
+  ctx.ellipse(-s * 0.2, s * 0.1, s * 0.3, s * 0.2, -0.2, 0, Math.PI * 2);
   ctx.fill();
   
-  // Soft Outline
-  ctx.stroke();
-
-  // 3. Blush (Rosy Cheeks) ☺️
-  ctx.fillStyle = 'rgba(255, 138, 128, 0.6)'; // Soft Pink
-  ctx.beginPath();
-  ctx.ellipse(s * 0.35, s * 0.15, s * 0.12, s * 0.08, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 4. Eyes (Big Black Beads with Sparkles) 👀
-  const eyeX = s * 0.25;
-  const eyeY = -s * 0.15;
-  
-  // Eye Shape
-  ctx.fillStyle = '#212121'; // Soft Black
-  ctx.beginPath();
-  ctx.ellipse(eyeX, eyeY, s * 0.12, s * 0.16, 0, 0, Math.PI * 2);
-  ctx.fill();
-  
-  // Big Sparkle (Top Right)
+  // -- Eye (Big & Cute) --
+  // White background
   ctx.fillStyle = 'white';
   ctx.beginPath();
-  ctx.arc(eyeX + s*0.04, eyeY - s*0.05, s * 0.04, 0, Math.PI * 2);
+  ctx.ellipse(s * 0.3, -s * 0.2, s * 0.25, s * 0.3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Black pupil
+  ctx.fillStyle = '#212121';
+  ctx.beginPath();
+  ctx.arc(s * 0.35, -s * 0.2, s * 0.12, 0, Math.PI * 2);
+  ctx.fill();
+  // Shiny highlight
+  ctx.fillStyle = 'white';
+  ctx.beginPath();
+  ctx.arc(s * 0.4, -s * 0.25, s * 0.05, 0, Math.PI * 2);
+  ctx.fill();
+
+  // -- Bill (Orange & Rounded) --
+  // billOpenAmount: 0 = closed, 1 = open
+  const open = billOpenAmount * 0.5; // Max open angle
+  
+  // Top Bill
+  ctx.save();
+  ctx.translate(s * 0.65, 0); // Anchor point
+  ctx.rotate(-open);
+  ctx.fillStyle = '#FF9800';
+  ctx.beginPath();
+  ctx.ellipse(s * 0.2, -s * 0.05, s * 0.25, s * 0.12, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  
+  // Bottom Bill
+  ctx.save();
+  ctx.translate(s * 0.65, 0.1 * s);
+  ctx.rotate(open * 0.5);
+  ctx.fillStyle = '#F57C00';
+  ctx.beginPath();
+  ctx.ellipse(s * 0.15, s * 0.05, s * 0.2, s * 0.1, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // -- Pink Blush Cheek --
+  ctx.fillStyle = 'rgba(255, 82, 82, 0.4)';
+  ctx.beginPath();
+  ctx.arc(s * 0.1, 0.1 * s, s * 0.15, 0, Math.PI * 2);
   ctx.fill();
   
-  // Little Sparkle (Bottom Left)
-  ctx.beginPath();
-  ctx.arc(eyeX - s*0.04, eyeY + s*0.07, s * 0.02, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 5. Beak (Rounded & Happy) 
-  const beakX = s * 0.5;
-  const beakY = s * 0.1;
-  const open = billOpenAmount * 0.5; // Max open angle
-
-  // Upper Beak
-  ctx.save();
-  ctx.translate(beakX, beakY - s*0.02);
-  ctx.rotate(-open);
-  ctx.fillStyle = '#FF9800'; // Orange
-  ctx.beginPath();
-  ctx.ellipse(0, 0, s * 0.22, s * 0.12, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // Tiny Nostril
-  ctx.fillStyle = '#E65100';
-  ctx.beginPath();
-  ctx.arc(s * 0.08, -s * 0.04, s * 0.015, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-
-  // Lower Beak
-  ctx.save();
-  ctx.translate(beakX, beakY + s*0.02);
-  ctx.rotate(open * 0.8); // Bottom moves more
-  ctx.fillStyle = '#FFB74D'; // Lighter Orange
-  ctx.beginPath();
-  ctx.ellipse(0, 0, s * 0.18, s * 0.1, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-
-  // Wing (Tiny cute flap)
-  ctx.fillStyle = '#FBC02D'; // Darker yellow for wing
-  ctx.beginPath();
-  ctx.ellipse(-s * 0.3, s * 0.2, s * 0.25, s * 0.15, -0.5, 0, Math.PI * 2);
-  ctx.fill();
-
   ctx.restore();
 }
 
