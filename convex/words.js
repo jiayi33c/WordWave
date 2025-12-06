@@ -5,6 +5,7 @@
 
 import { action } from "./_generated/server";
 import { v } from "convex/values";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 /**
  * Generate child-friendly synonyms and antonyms for a given word.
@@ -16,7 +17,7 @@ export const generateChildFriendlyWords = action({
   },
   handler: async (ctx, args) => {
     const { word, count = 8 } = args;
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY?.trim();
 
     if (!apiKey) {
       throw new Error("GEMINI_API_KEY is not set in Convex environment.");
@@ -35,40 +36,20 @@ Requirements:
   "antonyms": ["..."]
 }`;
 
-    // Use gemini-1.5-flash (faster, cheaper) or gemini-1.5-pro (better quality)
-    // Try flash first, fallback to pro if needed
-    const model = "gemini-1.5-flash";
-    
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.7,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 512,
-          },
-        }),
-      }
-    );
+    // Use Google AI SDK with gemini-2.0-flash
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Gemini API error ${res.status}: ${text}`);
-    }
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const generated = response.text();
 
-    const data = await res.json();
-    const generated = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!generated) throw new Error("No text returned from Gemini.");
 
     let jsonText = generated.trim();
     // Strip possible markdown fences
     if (jsonText.startsWith("```")) {
-      jsonText = jsonText.replace(/```json\\n?|```\\n?/g, "").replace(/```$/, "");
+      jsonText = jsonText.replace(/```json\n?|```\n?/g, "").replace(/```$/, "").trim();
     }
 
     const parsed = JSON.parse(jsonText);
