@@ -1,90 +1,122 @@
 /**
- * ElevenLabs Service - Text to Speech
+ * ElevenLabs Service - Text to Speech via Convex (server-side key)
+ * Falls back to browser TTS if server call fails.
  */
 
-import { audioService } from './audioService';
+import { ConvexHttpClient } from "convex/browser";
 
-const API_KEY = 'sk_d4546df8cf54d7384a85252f83277566702820c785530164'; // This should ideally be an env var
-const VOICE_ID = '21m00Tcm4TlvDq8ikWAM'; // Rachel
+const VOICE_ID = "XJ2fW4ybq7HouelYYGcL"; // Wordwave custom teacher voice
 
 class ElevenLabsService {
   constructor() {
     this.cache = new Map();
+    this.convex = null;
+    try {
+      const url = import.meta.env.VITE_CONVEX_URL;
+      if (url) {
+        this.convex = new ConvexHttpClient(url);
+        console.log("✅ Convex client ready for ElevenLabs TTS");
+      } else {
+        console.warn("⚠️ VITE_CONVEX_URL not set. ElevenLabs will use fallback.");
+      }
+    } catch (e) {
+      console.warn("⚠️ Convex client init failed:", e);
+    }
   }
 
-  async speak(text) {
-    if (this.cache.has(text)) {
-      return this.cache.get(text);
+  /**
+   * Decode base64 audio to AudioBuffer
+   */
+  async decodeBase64ToBuffer(base64) {
+    const binary = atob(base64);
+    const len = binary.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    return await audioContext.decodeAudioData(bytes.buffer);
+  }
+
+  /**
+   * Speak text via Convex + ElevenLabs
+   */
+  async speak(text, voiceId = VOICE_ID) {
+    const cacheKey = `${voiceId}:${text}`;
+    if (this.cache.has(cacheKey)) {
+      return this.cache.get(cacheKey);
     }
 
     try {
-      // Mock implementation for now or real API call
-      // Since I don't have the real API key in context safely (and shouldn't embed it),
-      // I will assume the previous implementation had a working key or a fallback.
-      // Re-using the key found in previous logs/knowledge if available, 
-      // otherwise using a fallback mock to prevent crashes.
-      
-      // ACTUALLY, I should try to fetch from API if key is valid.
-      // For now, let's implement a robust fallback that returns a dummy buffer if API fails.
-      
-      // Note: In a real scenario, I would ask the user for the key or check .env
-      
-      console.log('🗣️ Generating speech for:', text);
-      
-      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}/stream?optimize_streaming_latency=4`, {
-        method: 'POST',
-        headers: {
-          'xi-api-key': API_KEY,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text,
-          model_id: 'eleven_monolingual_v1',
-          voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.75,
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`ElevenLabs API failed: ${response.status} ${errorText}`);
+      if (!this.convex) {
+        throw new Error("Convex client not initialized");
       }
 
-      const arrayBuffer = await response.arrayBuffer();
-      // ... decode ...
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      console.log("🗣️ (Convex) Generating speech for:", text);
+      const data = await this.convex.action("elevenlabs:ttsWithTimestamps", {
+        text,
+        voiceId,
+      });
 
-      // ...
-      
-      return result;
+      const audioBuffer = await this.decodeBase64ToBuffer(data.audio_base64);
+      const alignment = data.alignment || {};
+      const characters = alignment.characters || [];
+      const charStartTimes = alignment.character_start_times_seconds || [];
+      const charEndTimes = alignment.character_end_times_seconds || [];
 
-    } catch (error) {
-      console.error('❌ ElevenLabs Voice Failed:', error);
-      
-      // Fallback: Try Browser Native TTS (Web Speech API)
-      // This won't give us an audio buffer for Tone.js easily, but we can just speak it?
-      // Actually, Tone.js needs a buffer. Capturing Web Speech API to buffer is hard.
-      
-      // So we stick to silent fallback for the *music* flow, but maybe we can synthesize a robotic voice using Tone?
-      // OR better: Use a simple Tone.js synth to "speak" (vocoder style) - too complex.
-      
-      // Let's just return the silent buffer but log loudly so we know.
-      
-      // Create silent/dummy buffer
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const buffer = ctx.createBuffer(1, ctx.sampleRate * 1.5, ctx.sampleRate); // 1.5s silence
-      
-      return {
-        audioBuffer: buffer,
-        duration: 1.5,
-        characters: text.split(''),
-        charStartTimes: text.split('').map((_, i) => i * (1.5 / text.length)),
-        isFallback: true
+      const result = {
+        audioBuffer,
+        text,
+        characters,
+        charStartTimes,
+        charEndTimes,
+        duration: audioBuffer.duration,
       };
+
+      this.cache.set(cacheKey, result);
+      return result;
+    } catch (error) {
+      console.error("❌ ElevenLabs Convex TTS failed, falling back:", error);
+      return this.fallbackSpeak(text);
     }
+  }
+
+  /**
+   * Browser TTS fallback when server/API fails
+   */
+  fallbackSpeak(text) {
+    console.log("⚠️ Using browser TTS fallback");
+    return new Promise((resolve) => {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.9;
+      utterance.pitch = 1.1;
+
+      // Estimate timing
+      const avgCharDuration = 0.08;
+      const characters = text.split("");
+      const charStartTimes = characters.map((_, i) => i * avgCharDuration);
+      const charEndTimes = characters.map((_, i) => (i + 1) * avgCharDuration);
+
+      utterance.onend = () => {
+        resolve({
+          audioBuffer: null,
+          text,
+          characters,
+          charStartTimes,
+          charEndTimes,
+          duration: text.length * avgCharDuration,
+          isFallback: true,
+        });
+      };
+
+      window.speechSynthesis.speak(utterance);
+    });
+  }
+
+  setVoice(voiceId) {
+    this.defaultVoiceId = voiceId;
+  }
+
+  clearCache() {
+    this.cache.clear();
   }
 }
 
