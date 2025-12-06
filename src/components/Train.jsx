@@ -21,12 +21,6 @@ export const Train = forwardRef((props, ref) => {
         <meshStandardMaterial color="#FFA726" roughness={0.3} />
       </mesh>
       
-      {/* Smoke puffs (static for now) */}
-      <mesh position={[0, 2.8, -1]} scale={0.5}>
-        <sphereGeometry args={[0.8, 16, 16]} />
-        <meshStandardMaterial color="white" transparent opacity={0.8} />
-      </mesh>
-
       {/* Face/Front */}
       <mesh position={[0, 1, -1.65]}>
         <circleGeometry args={[0.6, 32]} />
