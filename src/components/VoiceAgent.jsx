@@ -578,6 +578,21 @@ You can use these tools:
     };
   }, []);
 
+  // AUTO-START on first interaction (Click anywhere in the app)
+  useEffect(() => {
+    const handleGlobalClick = () => {
+        // If we are disconnected and inactive, try to start listening on any click
+        if (status === 'disconnected' && wakeWordStatus === 'inactive') {
+            console.log("🖱️ User interacted, starting wake word listener...");
+            startWakeWordListener();
+        }
+    };
+
+    // Listen for any click on the page
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
+  }, [status, wakeWordStatus, startWakeWordListener]);
+
   return (
     <div style={{ position: "fixed", bottom: 20, right: 250, zIndex: 1000, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       {/* Avatar - Control visibility */}
