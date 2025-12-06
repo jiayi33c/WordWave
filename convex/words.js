@@ -35,8 +35,12 @@ Requirements:
   "antonyms": ["..."]
 }`;
 
+    // Use gemini-1.5-flash (faster, cheaper) or gemini-1.5-pro (better quality)
+    // Try flash first, fallback to pro if needed
+    const model = "gemini-1.5-flash";
+    
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
