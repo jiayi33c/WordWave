@@ -22,26 +22,36 @@ export function HotAirBalloon({ position = [0, 20, 0], color = "#FF7043", isPlay
   const synthRef = useRef(null);
   const transportEventId = useRef(null);
 
-  // 1. Initialize Synth (Lightweight Piano)
+  // 1. Initialize Synth (Matches Train Whistle - Triangle + Reverb)
   useEffect(() => {
+    // Use Triangle oscillator for a clearer, flutey tone (like the train)
     const synth = new Tone.PolySynth(Tone.Synth, {
       maxPolyphony: 6,
       options: {
-        oscillator: { type: "triangle" }, // Triangle sounds closer to keys than sine
+        oscillator: { type: "triangle" },
         envelope: {
-          attack: 0.02,
-          decay: 0.1,
-          sustain: 0.3,
-          release: 1,
+          attack: 0.05,
+          decay: 0.2,
+          sustain: 0.2,
+          release: 1.5,
         },
-        volume: -10
+        volume: -12
       }
+    });
+    
+    // Add Reverb for that "background" spacious feel
+    const reverb = new Tone.Reverb({
+      decay: 3,
+      wet: 0.3
     }).toDestination();
+    
+    synth.connect(reverb);
     
     synthRef.current = synth;
 
     return () => {
       synth.dispose();
+      reverb.dispose();
     };
   }, []);
 
@@ -55,29 +65,30 @@ export function HotAirBalloon({ position = [0, 20, 0], color = "#FF7043", isPlay
 
     if (isPlaying) {
       // Create a repeating event every 4 measures
-      // We offset it based on position so they don't all fire at once (optional)
-      // But to sync with "the music", hitting on the '1' (0m) is best.
       
       const scheduleId = Tone.Transport.scheduleRepeat((time) => {
         // A. TRIGGER AUDIO (Scheduled ahead of time)
         if (synthRef.current) {
-          // Simple major chord
-          synthRef.current.triggerAttackRelease(["C5", "E5", "G5"], "8n", time);
+          // Play a chord that harmonizes with the Train's G Major
+          // C Major 9 (C-E-G-B-D) sounds very dreamy and open
+          const notes = Math.random() > 0.5 
+            ? ["C4", "E4", "G4", "B4"] // C Maj7
+            : ["F4", "A4", "C5", "E5"]; // F Maj7
+            
+          synthRef.current.triggerAttackRelease(notes, "2n", time);
         }
 
         // B. TRIGGER VISUAL (Synced to the exact frame the audio plays)
         Tone.Draw.schedule(() => {
-          // This callback runs on the requestAnimationFrame closest to 'time'
           isBurningRef.current = true;
           
-          // Schedule the flame to turn off after 1 second
-          // We can use setTimeout here because we are already in the visual timeline
+          // Burn for 2 seconds
           setTimeout(() => {
             isBurningRef.current = false;
-          }, 1000);
+          }, 2000);
         }, time);
 
-      }, "4m", "0m"); // Start at 0m (beginning of a bar), repeat every 4m
+      }, "4m", "0m"); // Start at 0m, repeat every 4m
 
       transportEventId.current = scheduleId;
     } else {

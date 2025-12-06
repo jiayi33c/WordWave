@@ -6,8 +6,8 @@ import * as Tone from 'tone';
 // Smoke Particle Component
 function Smoke({ position, onPuff }) {
   const ref = useRef();
-  const [speed] = useState(() => 0.015 + Math.random() * 0.01); // Slower rise
-  const respawnTime = useRef(0); // When to respawn
+  const [speed] = useState(() => 0.03 + Math.random() * 0.02); // Faster rise
+  const respawnTime = useRef(0);
 
   useFrame((state) => {
     if (ref.current) {
@@ -26,25 +26,25 @@ function Smoke({ position, onPuff }) {
 
       ref.current.visible = true;
       ref.current.position.y += speed;
-      ref.current.scale.addScalar(0.003); // Slower growth
-      ref.current.material.opacity -= 0.005; // Slower fade
+      ref.current.scale.addScalar(0.025); // Puff up much bigger!
+      ref.current.material.opacity -= 0.008; 
       
       if (ref.current.material.opacity <= 0) {
         // Reset
         ref.current.position.set(0, 0, 0);
-        ref.current.scale.setScalar(0.4); // Start smaller
-        ref.current.material.opacity = 0.5;
+        ref.current.scale.setScalar(0.6); // Start bigger
+        ref.current.material.opacity = 0.9; // Start very visible
         
-        // Wait 3-6 seconds before next puff (Much less frequent!)
-        respawnTime.current = state.clock.elapsedTime + 3.0 + Math.random() * 3.0;
+        // Respawn frequently for a continuous stream
+        respawnTime.current = state.clock.elapsedTime + 0.2 + Math.random() * 0.8;
       }
     }
   });
 
   return (
     <mesh ref={ref} position={position}>
-      <sphereGeometry args={[0.3, 16, 16]} />
-      <meshBasicMaterial color="#ECEFF1" transparent opacity={0.5} />
+      <sphereGeometry args={[0.5, 16, 16]} />
+      <meshBasicMaterial color="#ECEFF1" transparent opacity={0.9} depthWrite={false} />
     </mesh>
   );
 }
@@ -199,8 +199,10 @@ export const Train = forwardRef(({ isPlaying = false, ...props }, ref) => {
         {isPlaying && (
             <group position={[0, 2.5, -1]}>
                 <Smoke position={[0, 0, 0]} onPuff={playWhistle} />
-                <Smoke position={[0.1, -0.2, 0.1]} />
-                <Smoke position={[-0.1, -0.4, -0.1]} />
+                <Smoke position={[0.2, -0.2, 0.2]} />
+                <Smoke position={[-0.2, -0.3, -0.1]} />
+                <Smoke position={[0.1, -0.5, -0.2]} />
+                <Smoke position={[-0.15, -0.4, 0.15]} />
             </group>
         )}
         
