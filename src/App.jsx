@@ -340,9 +340,15 @@ function Track({ isPlaying }) {
   );
 }
 
-function Scene({ handPos, isPinching, words, onWordGrab, onWordDrop, onWordClick, isPlaying, musicDuration, activeWordText, droppedWords }) {
+function Scene({ handPos, isPinching, words, onWordGrab, onWordDrop, onWordClick, isPlaying, musicDuration, activeWordText, droppedWords, onGestureSing }) {
   const trainRef = useRef();
   const [isMoving, setIsMoving] = useState(false); 
+  
+  // Gesture state
+  const pinchStartTime = useRef(0);
+  const gestureProgress = useRef(0);
+  const gestureRingRef = useRef();
+  const GESTURE_THRESHOLD = 1.5; // hold for 1.5s to start
   
   // Train movement state
   const startAngle = Math.PI + 0.6;
@@ -447,8 +453,8 @@ function Scene({ handPos, isPinching, words, onWordGrab, onWordDrop, onWordClick
     }
   });
 
-  // Grab Logic - Uses SCREEN SPACE comparison (2D) for accurate visual overlap
-  useFrame(() => {
+  // Grab Logic & Gesture Detection
+  useFrame((state, delta) => {
     // Always calculate hover state if hand is present
     // AND only if NOT playing (can't grab words during song)
     if (handPos && !isPlaying) {
@@ -503,18 +509,68 @@ function Scene({ handPos, isPinching, words, onWordGrab, onWordDrop, onWordClick
         setHoveredWordIdx(closestIdx);
       }
 
-      // Check for grab
-      if (isPinching && closestCloud) {
-          recentlyGrabbed.current.add(closestCloud.text);
-          setTimeout(() => {
-            recentlyGrabbed.current.delete(closestCloud.text);
-          }, 500);
+      // Check for grab vs Sing Gesture
+      if (isPinching) {
+          if (closestCloud) {
+              // Grabbing a word
+              recentlyGrabbed.current.add(closestCloud.text);
+              setTimeout(() => {
+                recentlyGrabbed.current.delete(closestCloud.text);
+              }, 500);
+              
+              onWordGrab(closestCloud);
+              onWordDrop(closestCloud);
+              
+              // Reset gesture if grabbing
+              gestureProgress.current = 0;
+          } else {
+              // Pinching EMPTY AIR -> Sing Gesture!
+              // Only if we have collected words
+              if (droppedWords.length > 0) {
+                  gestureProgress.current += delta;
+                  if (gestureProgress.current > GESTURE_THRESHOLD) {
+                      onGestureSing();
+                      gestureProgress.current = 0;
+                  }
+              }
+          }
+      } else {
+          // Not pinching
+          gestureProgress.current = 0;
+      }
+
+      // Update Gesture Ring Visual
+      if (gestureRingRef.current && handPos) {
+          // Position: Unproject smoothed hand pos to 3D space in front of camera
+          // We need a position that follows the cursor but exists in 3D world
+          const vec = new THREE.Vector3(
+            (smoothedHandPos.current.x * 2) - 1,
+            -(smoothedHandPos.current.y * 2) + 1,
+            0.5 
+          );
+          vec.unproject(camera);
+          const dir = vec.sub(camera.position).normalize();
+          const distance = 10; // Fixed distance
+          const pos = camera.position.clone().add(dir.multiplyScalar(distance));
           
-          onWordGrab(closestCloud);
-          onWordDrop(closestCloud);
+          gestureRingRef.current.position.copy(pos);
+          gestureRingRef.current.lookAt(camera.position);
+          
+          const progress = Math.min(gestureProgress.current / GESTURE_THRESHOLD, 1);
+          const scale = progress * 0.8 + 0.01; // Grow from 0
+          gestureRingRef.current.scale.setScalar(scale);
+          gestureRingRef.current.visible = progress > 0.01;
+          
+          // Color pulse
+          if (gestureRingRef.current.material) {
+             gestureRingRef.current.material.opacity = 0.5 + progress * 0.5;
+             gestureRingRef.current.material.color.setHSL(progress * 0.3, 1, 0.5); // Red to Green
+          }
       }
     } else {
       if (hoveredWordIdx !== -1) setHoveredWordIdx(-1);
+      gestureProgress.current = 0;
+      if (gestureRingRef.current) gestureRingRef.current.visible = false;
     }
   });
   
@@ -686,6 +742,12 @@ function Scene({ handPos, isPinching, words, onWordGrab, onWordDrop, onWordClick
           />
         );
       })}
+      
+      {/* Gesture Feedback Ring */}
+      <mesh ref={gestureRingRef} visible={false}>
+         <ringGeometry args={[0.5, 0.7, 32]} />
+         <meshBasicMaterial color="#FFD700" transparent opacity={0.8} side={THREE.DoubleSide} />
+      </mesh>
     </>
   );
 }
@@ -956,6 +1018,7 @@ function App() {
            musicDuration={musicDuration}
            activeWordText={activeWordText}
            droppedWords={droppedWords}
+           onGestureSing={handleSing}
         />
       </Canvas>
       
@@ -1023,6 +1086,7 @@ function App() {
         onPlaybackStatusChange={handlePlaybackStatusChange}
         onMusicDurationCalculated={handleMusicDurationCalculated}
         onWordActive={handleWordActive}
+        cameraEnabled={cameraEnabled}
       />
 
       {/* ElevenLabs Voice Agent (bottom-right) */}

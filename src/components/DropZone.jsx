@@ -52,7 +52,8 @@ export function DropZone({
   onPlaybackComplete,
   onPlaybackStatusChange, // New prop to notify parent of detailed status
   onMusicDurationCalculated, // Callback to report total music duration
-  onWordActive // Callback when a specific word starts playing
+  onWordActive, // Callback when a specific word starts playing
+  cameraEnabled = false // Prop to check if camera is active
 }) {
   // Playback state
   const [phase, setPhase] = useState(PHASES.IDLE);
@@ -665,13 +666,16 @@ export function DropZone({
     <div style={styles.container}>
       {/* Header with phase indicator */}
       <div style={styles.header}>
-        <span style={styles.headerTitle}>
-          🎵 {droppedWords.length > 0 
-            ? `Lyrics (${droppedWords.length} word${droppedWords.length !== 1 ? 's' : ''})` 
-            : 'Collect words to sing!'}
-        </span>
+        {/* Hide Lyrics count when playing to keep it clean */}
+        {phase !== PHASES.PLAYING && (
+          <span style={styles.headerTitle}>
+            🎵 {droppedWords.length > 0 
+              ? `Lyrics (${droppedWords.length} word${droppedWords.length !== 1 ? 's' : ''})` 
+              : 'Collect words to sing!'}
+          </span>
+        )}
         
-        {/* Phase badge */}
+        {/* Phase badge - Show ONLY this when playing */}
         {phase === PHASES.PLAYING && sessionPhase && (
           <span style={{
             ...styles.phaseBadge,
@@ -740,7 +744,7 @@ export function DropZone({
       )}
 
       {/* Action button */}
-      {droppedWords.length > 0 && (
+      {droppedWords.length > 0 && (!cameraEnabled || phase === PHASES.PLAYING) && (
         <button
           onClick={phase === PHASES.PLAYING ? handleStop : onSing}
           disabled={!canSing && phase !== PHASES.PLAYING}
@@ -788,34 +792,35 @@ const styles = {
     bottom: '20px',
     left: '50%',
     transform: 'translateX(-50%)',
-    width: '520px',
-    minHeight: '100px',
-    border: '4px solid #FFB74D',
-    borderRadius: '24px',
-    backgroundColor: 'rgba(255, 255, 255, 0.97)',
-    backdropFilter: 'blur(10px)',
+    width: '600px',
+    minHeight: '80px',
+    // Removed boxy container styles
+    backgroundColor: 'transparent',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    padding: '16px',
-    transition: 'all 0.3s ease',
+    padding: '10px',
     pointerEvents: 'auto',
     zIndex: 10,
-    boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
   },
   header: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     width: '100%',
-    marginBottom: '12px',
+    marginBottom: '15px',
     gap: '12px',
   },
   headerTitle: {
     fontFamily: '"Nunito", "Comic Sans MS", sans-serif',
-    color: '#FF6F00',
-    fontSize: '17px',
-    fontWeight: 'bold',
+    color: '#FFF', // White text with shadow for contrast against 3D bg
+    fontSize: '20px',
+    fontWeight: '800',
+    textShadow: '0 2px 4px rgba(0,0,0,0.2)',
+    background: 'rgba(255, 111, 0, 0.8)', // Orange badge
+    padding: '6px 16px',
+    borderRadius: '20px',
+    backdropFilter: 'blur(4px)',
   },
   phaseBadge: {
     display: 'flex',
@@ -824,96 +829,112 @@ const styles = {
     padding: '6px 14px',
     borderRadius: '20px',
     color: 'white',
-    fontSize: '13px',
+    fontSize: '14px',
     fontWeight: 'bold',
     fontFamily: '"Nunito", sans-serif',
-    boxShadow: '0 3px 10px rgba(0,0,0,0.2)',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
     animation: 'pulse 1s ease-in-out infinite',
+    border: '2px solid white',
   },
-  // Loading bar style removed since we don't use it anymore
   celebration: {
     padding: '20px',
-    fontSize: '24px',
+    fontSize: '28px',
     fontWeight: 'bold',
-    color: '#38ef7d',
+    color: '#fff',
+    textShadow: '0 2px 10px rgba(0,0,0,0.3)',
     fontFamily: '"Nunito", sans-serif',
     textAlign: 'center',
     animation: 'celebrationBounce 0.5s ease',
   },
   wordsContainer: {
     width: '100%',
-    padding: '16px',
-    background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
-    borderRadius: '16px',
-    marginBottom: '14px',
+    padding: '10px',
+    // Removed dark background
+    background: 'transparent',
+    display: 'flex',
+    justifyContent: 'center',
+    marginBottom: '20px',
   },
   wordsGrid: {
     display: 'flex',
     flexWrap: 'wrap',
-    gap: '10px',
+    gap: '12px',
     justifyContent: 'center',
     alignItems: 'center',
   },
   word: {
-    padding: '8px 18px',
-    borderRadius: '14px',
-    fontSize: '18px',
+    padding: '10px 24px',
+    borderRadius: '30px', // Pill shape
+    fontSize: '20px',
     fontWeight: 'bold',
     fontFamily: '"Nunito", sans-serif',
-    background: 'rgba(255,255,255,0.12)',
-    color: 'white',
-    border: '2px solid rgba(255,255,255,0.15)',
-    transition: 'all 0.3s ease',
+    // Fun, floaty style
+    background: 'white',
+    color: '#455A64',
+    boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
+    border: '3px solid #B3E5FC', // Light blue border
+    transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)', // Bouncy transition
+    cursor: 'default',
   },
   wordPast: {
-    opacity: 0.4,
-    transform: 'scale(0.9)',
+    opacity: 0.6,
+    transform: 'scale(0.95)',
+    background: 'rgba(255,255,255,0.7)',
+    border: '3px solid transparent',
   },
   wordFuture: {
-    opacity: 0.6,
+    opacity: 0.9,
   },
   activeWordContainer: {
     display: 'flex',
-    gap: '4px',
-    padding: '8px 12px',
-    background: 'rgba(255, 217, 61, 0.15)',
-    borderRadius: '16px',
-    border: '2px solid rgba(255, 217, 61, 0.4)',
+    gap: '6px',
+    padding: '12px 20px',
+    background: '#FFF',
+    borderRadius: '30px',
+    border: '4px solid #FFD54F', // Gold border for active
+    boxShadow: '0 8px 20px rgba(255, 213, 79, 0.4)',
+    transform: 'scale(1.1)', // Pop out!
   },
   syllable: {
-    fontSize: '26px',
-    fontWeight: 'bold',
+    fontSize: '28px',
+    fontWeight: '800',
     fontFamily: '"Nunito", sans-serif',
-    color: 'rgba(255,255,255,0.8)',
-    padding: '4px 8px',
+    color: '#546E7A',
+    padding: '2px 6px',
     borderRadius: '8px',
-    transition: 'all 0.12s cubic-bezier(0.4, 0, 0.2, 1)',
+    transition: 'all 0.1s',
   },
   syllableActive: {
-    color: '#ffd93d',
-    transform: 'scale(1.25) translateY(-4px)',
-    textShadow: '0 0 20px rgba(255, 217, 61, 0.8)',
-    background: 'rgba(255, 217, 61, 0.2)',
+    color: '#FF6F00',
+    transform: 'scale(1.2)',
+    textShadow: '0 2px 4px rgba(255, 111, 0, 0.2)',
   },
   button: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     gap: '10px',
-    padding: '14px 44px',
-    borderRadius: '20px',
-    border: 'none',
+    padding: '16px 48px',
+    borderRadius: '50px', // Round button
+    border: '4px solid rgba(255,255,255,0.3)',
     color: 'white',
-    fontSize: '18px',
-    fontWeight: 'bold',
+    fontSize: '20px',
+    fontWeight: '800',
     fontFamily: '"Nunito", sans-serif',
     transition: 'all 0.2s ease',
+    boxShadow: '0 6px 20px rgba(0,0,0,0.2)',
+    textShadow: '0 1px 2px rgba(0,0,0,0.2)',
   },
   emptyHint: {
-    color: '#999',
-    fontSize: '14px',
+    color: '#FFF',
+    fontSize: '16px',
+    fontWeight: 'bold',
     fontFamily: '"Nunito", sans-serif',
-    marginTop: '5px',
+    marginTop: '10px',
+    textShadow: '0 2px 4px rgba(0,0,0,0.2)',
+    background: 'rgba(0,0,0,0.1)',
+    padding: '8px 16px',
+    borderRadius: '20px',
   },
 };
 
