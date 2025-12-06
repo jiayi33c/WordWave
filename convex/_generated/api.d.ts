@@ -9,6 +9,7 @@
  */
 
 import type * as elevenlabs from "../elevenlabs.js";
+import type * as words from "../words.js";
 
 import type {
   ApiFromModules,
@@ -18,6 +19,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   elevenlabs: typeof elevenlabs;
+  words: typeof words;
 }>;
 
 /**
