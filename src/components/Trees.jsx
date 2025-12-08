@@ -2,7 +2,7 @@ import React, { useMemo, memo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-const Tree = ({ position, scale, color, bounce }) => {
+const Tree = ({ position, scale, color, isPlaying, bounce = 0 }) => {
   const meshRef = useRef();
   const baseY = position[1];
   
@@ -12,58 +12,72 @@ const Tree = ({ position, scale, color, bounce }) => {
   const leafMatRef1 = useRef();
   const leafMatRef2 = useRef();
   
-  // Only use macaroon colors if bouncing (music playing)
-  const isPlaying = bounce > 0.01; 
+  // Macaroon colors for leaves - Soft but visible pastels!
+  const macaroonColors = useMemo(() => [
+    "#FFCDD2", // Soft Rose
+    "#B3E5FC", // Soft Sky Blue
+    "#E1BEE7", // Soft Lavender
+    "#FFF59D", // Soft Lemon
+    "#C8E6C9", // Soft Mint
+    "#FFE0B2", // Soft Peach
+  ], []);
+  
+  // Standard nature colors
+  const natureColors = useMemo(() => [
+    "#81C784", // Medium Green
+    "#AED581", // Light Green
+    "#A5D6A7", // Soft Green
+  ], []);
   
   useFrame((state, delta) => {
+    const t = state.clock.getElapsedTime();
+    
+    // Local bounce calculation if prop is missing, otherwise use prop
+    let effectiveBounce = bounce;
+    if (bounce === 0 && isPlaying) {
+         effectiveBounce = Math.max(0, Math.sin(t * Math.PI * 4));
+    }
+    
     if (meshRef.current) {
       // Wobbly dance effect when music plays
       const wobble = Math.sin(Date.now() * 0.01) * 0.1;
-      meshRef.current.rotation.z = wobble * bounce;
+      meshRef.current.rotation.z = wobble * effectiveBounce;
       
       // Jump up when bouncing
-      meshRef.current.position.y = baseY + (bounce * 0.3);
+      meshRef.current.position.y = baseY + (effectiveBounce * 0.5);
       
       // Squash/stretch
-      const stretch = 1 + (bounce * 0.2);
-      const squash = 1 - (bounce * 0.1);
+      const stretch = 1 + (effectiveBounce * 0.3);
+      const squash = 1 - (effectiveBounce * 0.15);
       meshRef.current.scale.set(scale * squash, scale * stretch, scale * squash);
     }
     
-    // Smooth fade for colors
-    const speed = delta * 1.5; // Slower transition (was 3) for better visibility
-    const trunkTarget = new THREE.Color(isPlaying ? "#5D4037" : "#795548"); 
+    // Color pulsing logic
+    const speed = delta * 2.0;
+    const posIndex = Math.floor(position[0] + position[2]);
+    
+    // Calculate color blend factor (0 = nature, 1 = macaroon)
+    // When playing, oscillate between 0 and 1 based on beat
+    // When not playing, stay at 0 (nature colors)
+    const colorBlend = isPlaying ? (Math.sin(t * 2) + 1) / 2 : 0; // Smooth oscillation 0-1
+    
+    // Trunk color - pulse between browns
+    const trunkNature = new THREE.Color("#795548");
+    const trunkMacaroon = new THREE.Color("#A1887F");
+    const trunkTarget = trunkNature.clone().lerp(trunkMacaroon, colorBlend);
     if (trunkMatRef.current) trunkMatRef.current.color.lerp(trunkTarget, speed);
     
-    // Leaf colors logic
+    // Leaf colors - pulse between nature and macaroon
     const leafTargets = [0, 1, 2].map(offset => {
-        if (isPlaying) {
-            return new THREE.Color(macaroonColors[(Math.floor(position[0] + position[2]) + offset) % macaroonColors.length]);
-        }
-        return new THREE.Color(natureColors[offset % natureColors.length]);
+        const natureColor = new THREE.Color(natureColors[offset % natureColors.length]);
+        const macaroonColor = new THREE.Color(macaroonColors[(Math.abs(posIndex) + offset) % macaroonColors.length]);
+        return natureColor.clone().lerp(macaroonColor, colorBlend);
     });
     
     if (leafMatRef0.current) leafMatRef0.current.color.lerp(leafTargets[0], speed);
     if (leafMatRef1.current) leafMatRef1.current.color.lerp(leafTargets[1], speed);
     if (leafMatRef2.current) leafMatRef2.current.color.lerp(leafTargets[2], speed);
   });
-
-  // Macaroon colors for leaves - Darker & richer to pop against pastel background
-  const macaroonColors = [
-    "#0097A7", // Deep Cyan
-    "#D81B60", // Deep Pink
-    "#8E24AA", // Deep Purple
-    "#E64A19", // Deep Orange
-    "#3949AB", // Deep Indigo
-    "#FFA000", // Deep Amber
-  ];
-  
-  // Standard nature colors
-  const natureColors = [
-    "#76FF03", // Bright Lime
-    "#C6FF00", // Yellow-Green
-    "#B2FF59", // Light Lime
-  ];
 
   return (
     <group ref={meshRef} position={[position[0], baseY, position[2]]} scale={scale}>
@@ -76,15 +90,15 @@ const Tree = ({ position, scale, color, bounce }) => {
       {/* Leaves - Dynamic Theme */}
       <mesh position={[0, 2.2, 0]}>
         <sphereGeometry args={[1.2, 16, 16]} />
-        <meshStandardMaterial ref={leafMatRef0} color={natureColors[0]} />
+        <meshStandardMaterial ref={leafMatRef0} color="#81C784" />
       </mesh>
       <mesh position={[0.8, 1.8, 0]} scale={0.7}>
         <sphereGeometry args={[1, 16, 16]} />
-        <meshStandardMaterial ref={leafMatRef1} color={natureColors[1]} />
+        <meshStandardMaterial ref={leafMatRef1} color="#AED581" />
       </mesh>
       <mesh position={[-0.8, 1.8, 0]} scale={0.7}>
          <sphereGeometry args={[1, 16, 16]} />
-         <meshStandardMaterial ref={leafMatRef2} color={natureColors[2]} />
+         <meshStandardMaterial ref={leafMatRef2} color="#A5D6A7" />
       </mesh>
       
       {/* Top fruit/flower - ALWAYS colorful */}
@@ -104,7 +118,7 @@ function getTrackPosition(angle) {
   return { x, z };
 }
 
-export const Trees = memo(function Trees({ count = 20, boundary = 100, bounce = 0 }) {
+export const Trees = memo(function Trees({ count = 20, boundary = 100, isPlaying = false, bounce = 0 }) {
   const trees = useMemo(() => {
     const positions = [];
     // Macaroon palette for top accents
@@ -179,7 +193,8 @@ export const Trees = memo(function Trees({ count = 20, boundary = 100, bounce = 
           position={t.pos} 
           scale={t.scale} 
           color={t.color} 
-          bounce={bounce} 
+          isPlaying={isPlaying}
+          bounce={bounce}
         />
       ))}
     </group>
