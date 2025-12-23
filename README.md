@@ -1,5 +1,5 @@
 # WordWave 🌊
-**Interactive AI Music & Language Learning for Kids**
+**Gesture, Sound and AI: A Multimodal Approach to Vocabulary Learning**
 
 What if children learned new words by moving, speaking, and playing with an AI companion in the room, rather than filling in worksheets or repeating the same drills?
 
@@ -24,8 +24,6 @@ An AI agent is woven into the experience as a conversational companion. By sayin
 WordWave uses a real time multimodal architecture with a browser based frontend and a lightweight backend deployed on Vercel. Three.js renders the 3D scene and maps hand and gesture inputs directly to interactive word states. Magenta generates structured musical feedback in response to user actions. Speech interaction is handled by an ElevenLabs voice agent, activated via the wake phrase "Hey Lulu", enabling spoken queries and vocal output.
 
 While WordWave is an early prototype, it points toward broader possibilities for embodied learning beyond vocabulary. The same interaction patterns could be extended to concepts like numbers, emotions, or storytelling. Future iterations may explore adaptive difficulty, collaborative play, and integration into classroom settings.
-
-### Gesture, Sound and AI: A Multimodal Approach to Vocabulary Learning
 
 ### 🛠️ Tech Stack
 *   **Frontend**: React, Vite, Three.js (React Three Fiber), Framer Motion
