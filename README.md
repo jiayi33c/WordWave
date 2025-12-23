@@ -32,5 +32,5 @@ While WordWave is an early prototype, it points toward broader possibilities for
 *   **Backend**: Convex (Serverless Functions)
 
 ---
-*Built for the AI & Voice Hackathon 2025*
+*Built for the Cursor Hackathon*
 
