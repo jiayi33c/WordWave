@@ -25,26 +25,7 @@ WordWave uses a real time multimodal architecture with a browser based frontend 
 
 While WordWave is an early prototype, it points toward broader possibilities for embodied learning beyond vocabulary. The same interaction patterns could be extended to concepts like numbers, emotions, or storytelling. Future iterations may explore adaptive difficulty, collaborative play, and integration into classroom settings.
 
-### 🚀 Key Features
-
-*   **🗣️ Conversational AI Teacher ("Lulu")**
-    *   Powered by **ElevenLabs Conversational AI**, Lulu understands the app's context (e.g., "You collected 'Sunshine'!").
-    *   Provides real-time, encouraging feedback and definitions in a warm, child-friendly voice.
-    *   Connects via **WebRTC** for low-latency natural conversation.
-
-*   **🎙️ Voice Activation**
-    *   Just say **"Hey Lulu"**! Integrated wake-word detection allows hands-free interaction using the Web Speech API.
-
-*   **🎵 Dynamic Music Generation**
-    *   Words are analyzed for **syllable timing** and rhythmically synced to a background beat.
-    *   Uses **Tone.js** and **Magenta.js** to generate unique melodies based on the collected words.
-
-*   **🛡️ Safe & Adaptive Content**
-    *   Powered by **Google Gemini 2.0 Flash** (via **Convex** backend), generating age-appropriate synonyms and rhymes on the fly.
-    *   Ensures a safe, curated learning environment for kids ages 5-10.
-
-*   **🎨 Immersive 3D World**
-    *   Physics-based interactive word clouds, animated avatars, and a playful "Sky Station" environment built with **Three.js (React Three Fiber)** and **Framer Motion**.
+### Gesture, Sound and AI: A Multimodal Approach to Vocabulary Learning
 
 ### 🛠️ Tech Stack
 *   **Frontend**: React, Vite, Three.js (React Three Fiber), Framer Motion
