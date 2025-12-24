@@ -209,48 +209,57 @@ class MagentaService {
   }
 
   /**
-   * Post-process melody to be kids-friendly
-   * 1. Snap to C Major Scale (Happy)
-   * 2. Quantize timings (Rhythmic)
-   * 3. Filter out too many short notes
+   * Post-process melody to be kids-friendly (Simple, Clean, Happy)
+   * 1. Snap to C Major Scale
+   * 2. Quantize to 8th notes (no fast runs)
+   * 3. Constrain pitch to one singable octave
    */
   makeKidsFriendly(sequence) {
-      const C_MAJOR = [0, 2, 4, 5, 7, 9, 11]; // C, D, E, F, G, A, B
+      const C_MAJOR = [0, 2, 4, 5, 7, 9, 11]; 
+      const QUANTIZE_STEP = 0.25; // 16th note at 120 BPM is 0.125s. Use 0.25s (8th) for simpler rhythm.
       
-      // Clone notes to avoid mutating original if needed
-      const newNotes = sequence.notes.map(note => {
-          let pitch = note.pitch;
-          const pitchClass = pitch % 12;
-          
-          // Snap to nearest C Major note
-          if (!C_MAJOR.includes(pitchClass)) {
-              // If not in scale, shift down 1 semitone (simple heuristic that works well for Major)
-              // e.g. Eb -> D, Bb -> A, F# -> F
-              pitch -= 1;
-          }
-          
-          // Transpose to C4-C6 range (middle high) for "cute" sound
-          // If too low, bump up octave
-          while (pitch < 60) pitch += 12; // Minimum Middle C
-          while (pitch > 84) pitch -= 12; // Maximum C6
-          
-          return { ...note, pitch };
-      });
-      
-      // Filter: Remove notes that are too short (ticks/glitches)
-      // or too close together (rapid fire)
-      const filteredNotes = [];
-      let lastTime = -1;
-      
-      newNotes.sort((a, b) => a.startTime - b.startTime).forEach(note => {
-          // Min duration 0.1s, Min gap 0.1s
-          if (note.endTime - note.startTime > 0.1 && note.startTime - lastTime > 0.1) {
-              filteredNotes.push(note);
-              lastTime = note.startTime;
-          }
-      });
+      const newNotes = sequence.notes
+        .map(note => {
+            // 1. Quantize Rhythm (Snap start/end to grid)
+            const start = Math.round(note.startTime / QUANTIZE_STEP) * QUANTIZE_STEP;
+            const end = Math.round(note.endTime / QUANTIZE_STEP) * QUANTIZE_STEP;
+            const duration = end - start;
+            
+            // Filter out super short notes
+            if (duration < QUANTIZE_STEP) return null;
 
-      return { ...sequence, notes: filteredNotes };
+            // 2. Snap Pitch to C Major
+            let pitch = note.pitch;
+            const pitchClass = pitch % 12;
+            if (!C_MAJOR.includes(pitchClass)) {
+                pitch -= 1; // Simple snap down
+            }
+            
+            // 3. Constrain Range (C4 to G5 - classic kids range)
+            // Force into C4 (60) octave first
+            while (pitch < 60) pitch += 12; 
+            while (pitch > 79) pitch -= 12; // Cap at G5
+            
+            return { 
+                ...note, 
+                pitch, 
+                startTime: start, 
+                endTime: end,
+                quantizedStartStep: Math.round(start * 8), // For Tone.js grid
+                quantizedEndStep: Math.round(end * 8)
+            };
+        })
+        .filter(n => n !== null) // Remove filtered short notes
+        // Remove overlapping notes (monophonic melody)
+        .sort((a, b) => a.startTime - b.startTime)
+        .filter((note, i, arr) => {
+            if (i === 0) return true;
+            const prev = arr[i-1];
+            // If overlaps with previous, only keep if it starts significantly later
+            return note.startTime >= prev.endTime; 
+        });
+
+      return { ...sequence, notes: newNotes };
   }
 
   /**

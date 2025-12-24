@@ -1,7 +1,8 @@
 import React, { useRef, useEffect, useState } from 'react';
 import Webcam from 'react-webcam';
-import { Hands } from '@mediapipe/hands';
-import { Camera } from '@mediapipe/camera_utils';
+// Use namespace imports to handle Vite/Rollup bundling differences for MediaPipe
+import * as mpHands from '@mediapipe/hands';
+import * as mpCamera from '@mediapipe/camera_utils';
 
 // Draw a cute cartoon duck!
 function drawDuck(ctx, x, y, size, billOpenAmount, facingLeft = false) {
@@ -93,6 +94,15 @@ const HandInput = ({ onHandMove, onPinch }) => {
   const smoothedPos = useRef({ x: 0.5, y: 0.5 });
 
   useEffect(() => {
+    // Safe resolution for Hands and Camera constructors to handle different build environments
+    const Hands = mpHands.Hands || (mpHands.default && mpHands.default.Hands) || window.Hands;
+    const Camera = mpCamera.Camera || (mpCamera.default && mpCamera.default.Camera) || window.Camera;
+
+    if (!Hands || !Camera) {
+        console.error("MediaPipe Hands or Camera could not be loaded.");
+        return;
+    }
+
     const hands = new Hands({
       locateFile: (file) => {
         return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
@@ -281,21 +291,6 @@ const HandInput = ({ onHandMove, onPinch }) => {
           ref={canvasRef}
           style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
         />
-      </div>
-      <div style={{ 
-        position: 'absolute', 
-        top: 20, 
-        left: 20, 
-        color: 'white', 
-        fontSize: '14px', 
-        textShadow: '1px 1px 2px black',
-        background: 'rgba(255, 200, 40, 0.9)',
-        padding: '8px 15px',
-        borderRadius: '15px',
-        border: '2px solid #FFA000',
-        fontFamily: '"Comic Sans MS", sans-serif'
-      }}>
-        {isLoaded ? "🦆 Ducky Mode!" : "Loading..."}
       </div>
     </div>
   );

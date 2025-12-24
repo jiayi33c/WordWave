@@ -6,8 +6,8 @@ import * as Tone from 'tone';
 // Smoke Particle Component
 function Smoke({ position, onPuff }) {
   const ref = useRef();
-  const [speed] = useState(() => 0.015 + Math.random() * 0.01); // Slower rise
-  const respawnTime = useRef(0); // When to respawn
+  const [speed] = useState(() => 0.03 + Math.random() * 0.02); // Faster rise
+  const respawnTime = useRef(0);
 
   useFrame((state) => {
     if (ref.current) {
@@ -26,30 +26,30 @@ function Smoke({ position, onPuff }) {
 
       ref.current.visible = true;
       ref.current.position.y += speed;
-      ref.current.scale.addScalar(0.003); // Slower growth
-      ref.current.material.opacity -= 0.005; // Slower fade
+      ref.current.scale.addScalar(0.025); // Puff up much bigger!
+      ref.current.material.opacity -= 0.008; 
       
       if (ref.current.material.opacity <= 0) {
         // Reset
         ref.current.position.set(0, 0, 0);
-        ref.current.scale.setScalar(0.4); // Start smaller
-        ref.current.material.opacity = 0.5;
+        ref.current.scale.setScalar(0.6); // Start bigger
+        ref.current.material.opacity = 0.9; // Start very visible
         
-        // Wait 3-6 seconds before next puff (Much less frequent!)
-        respawnTime.current = state.clock.elapsedTime + 3.0 + Math.random() * 3.0;
+        // Respawn frequently for a continuous stream
+        respawnTime.current = state.clock.elapsedTime + 0.2 + Math.random() * 0.8;
       }
     }
   });
 
   return (
     <mesh ref={ref} position={position}>
-      <sphereGeometry args={[0.3, 16, 16]} />
-      <meshBasicMaterial color="#ECEFF1" transparent opacity={0.5} />
+      <sphereGeometry args={[0.5, 16, 16]} />
+      <meshBasicMaterial color="#ECEFF1" transparent opacity={0.9} depthWrite={false} />
     </mesh>
   );
 }
 
-export const Train = forwardRef(({ bounce = 0, ...props }, ref) => {
+export const Train = forwardRef(({ isPlaying = false, ...props }, ref) => {
   const groupRef = useRef();
   const bodyMatRef = useRef();
   const chimneyMatRef = useRef();
@@ -101,24 +101,6 @@ export const Train = forwardRef(({ bounce = 0, ...props }, ref) => {
     };
   }, []);
 
-  // Play sound on beat (bounce peak)
-  useEffect(() => {
-    if (bounce > 0.8 && Date.now() - lastChuuTime.current > 400) {
-        if (Tone.Transport.state === 'started') {
-            const now = Tone.now();
-            
-            // 1. Play Noise Hiss
-            noiseSynthRef.current?.triggerAttackRelease('16n', now);
-            
-            // 2. Play Tonal Chug (Low C Major: C2, E2, G2)
-            // This acts as the harmonic bass/rhythm
-            chugSynthRef.current?.triggerAttackRelease(["C2", "G2"], "16n", now);
-            
-            lastChuuTime.current = Date.now();
-        }
-    }
-  }, [bounce]);
-
   // Whistle Trigger
   const playWhistle = () => {
       try {
@@ -145,6 +127,23 @@ export const Train = forwardRef(({ bounce = 0, ...props }, ref) => {
   useFrame((state) => {
     const time = state.clock.elapsedTime;
     
+    // Calculate local bounce here for performance
+    // 120 BPM = 2 beats/sec = 2 Hz. Sin(t * PI * 4) gives 2 peaks per sec
+    const beat = Math.sin(time * Math.PI * 4);
+    const bounce = isPlaying ? Math.max(0, beat) : 0;
+    
+    // Audio Trigger Logic (Check peak inside frame loop)
+    if (bounce > 0.8 && Date.now() - lastChuuTime.current > 400) {
+        if (Tone.Transport.state === 'started') {
+            const now = Tone.now();
+            try {
+                noiseSynthRef.current?.triggerAttackRelease('16n', now);
+                chugSynthRef.current?.triggerAttackRelease(["C2", "G2"], "16n", now);
+            } catch (e) { console.warn(e); }
+            lastChuuTime.current = Date.now();
+        }
+    }
+
     if (groupRef.current) {
       // Squash and stretch
       const stretch = 1 + (bounce * 0.15);
@@ -197,11 +196,14 @@ export const Train = forwardRef(({ bounce = 0, ...props }, ref) => {
         </mesh>
         
         {/* Smoke Particles (attached to chimney) */}
-        {bounce > 0.01 && (
+        {isPlaying && (
             <group position={[0, 2.5, -1]}>
-                <Smoke position={[0, 0, 0]} onPuff={playWhistle} />
-                <Smoke position={[0.1, -0.2, 0.1]} />
-                <Smoke position={[-0.1, -0.4, -0.1]} />
+                {/* Removed onPuff={playWhistle} to stop frequent background chords */}
+                <Smoke position={[0, 0, 0]} />
+                <Smoke position={[0.2, -0.2, 0.2]} />
+                <Smoke position={[-0.2, -0.3, -0.1]} />
+                <Smoke position={[0.1, -0.5, -0.2]} />
+                <Smoke position={[-0.15, -0.4, 0.15]} />
             </group>
         )}
         

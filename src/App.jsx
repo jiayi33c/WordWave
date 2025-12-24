@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Sky, Cloud } from '@react-three/drei';
+import { Sky, Cloud, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { Train } from './components/Train';
 import { Trees } from './components/Trees';
@@ -13,8 +13,10 @@ import HandInput from './components/HandInput';
 import { DropZone } from './components/DropZone';
 // CallResponsePlayer functionality is now integrated into DropZone
 import { fetchRelatedWords } from './utils/wordApi';
+import { audioService } from './services/audioService'; // Import audioService
 import * as patternService from './services/patternService';
 import { magentaService } from './services/magentaService';
+import VoiceAgent from './components/VoiceAgent';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Dynamic Beat Generator - Step Sequencer Style
@@ -183,26 +185,56 @@ function EnvironmentController({ isPlaying }) {
   
   // Current values (refs for direct manipulation)
   const groundMatRef = useRef();
+  const skyRef = useRef();
   
   useFrame((state, delta) => {
-    // Smooth transition speed
-    const speed = delta * 2; // Adjust speed as needed
+    const t = state.clock.getElapsedTime();
     
-    // Lerp background
+    // Calculate beat for groovy effect
+    const beat = Math.sin(t * Math.PI * 4); // 120 BPM
+    const bounce = isPlaying ? Math.max(0, beat) : 0;
+    
+    // Smooth transition speed
+    const speed = delta * 2;
+    
+    // Lerp background with groove pulse
     if (state.scene.background instanceof THREE.Color) {
       state.scene.background.lerp(targetBg, speed);
+      
+      // Add brightness pulse on beat when playing
+      if (isPlaying) {
+        const pulseColor = state.scene.background.clone();
+        pulseColor.offsetHSL(0, 0, bounce * 0.1); // Brighten on beat
+        state.scene.background.copy(pulseColor);
+      }
     } else {
         state.scene.background = targetBg.clone();
     }
     
-    // Lerp fog
+    // Lerp fog with groove pulse
     if (state.scene.fog) {
       state.scene.fog.color.lerp(targetFog, speed);
+      
+      // Pulse fog distance for "breathing" effect
+      if (isPlaying) {
+        state.scene.fog.near = 60 - bounce * 10; // Fog comes closer on beat
+        state.scene.fog.far = 150 - bounce * 20;
+      } else {
+        state.scene.fog.near = 60;
+        state.scene.fog.far = 150;
+      }
     }
     
-    // Lerp ground color
+    // Lerp ground color with groove pulse
     if (groundMatRef.current) {
       groundMatRef.current.color.lerp(targetGround, speed);
+      
+      // Ground brightness pulse
+      if (isPlaying) {
+        const groundPulse = groundMatRef.current.color.clone();
+        groundPulse.offsetHSL(0, bounce * 0.1, bounce * 0.05);
+        groundMatRef.current.color.copy(groundPulse);
+      }
     }
   });
 
@@ -216,6 +248,7 @@ function EnvironmentController({ isPlaying }) {
       </mesh>
       
       <Sky 
+        ref={skyRef}
         sunPosition={[100, 40, 100]} 
         turbidity={isPlaying ? 12 : 8} 
         rayleigh={isPlaying ? 1 : 3} 
@@ -307,9 +340,16 @@ function Track({ isPlaying }) {
   );
 }
 
-function Scene({ handPos, isPinching, words, onWordGrab, onWordDrop, onWordClick, isPlaying, musicDuration, activeWordText, droppedWords }) {
+function Scene({ handPos, isPinching, words, onWordGrab, onWordDrop, onWordClick, isPlaying, musicDuration, activeWordText, droppedWords, onGestureSing, currentPhase, sessionPhase }) {
   const trainRef = useRef();
-  const [isMoving, setIsMoving] = useState(false); 
+  const [isMoving, setIsMoving] = useState(false);  
+  
+  // Gesture state
+  const pinchStartTime = useRef(0);
+  const gestureProgress = useRef(0);
+  const gestureRingRef = useRef();
+  const phaseTextRef = useRef(); // Ref for animating the 3D text
+  const GESTURE_THRESHOLD = 1.5; // hold for 1.5s to start
   
   // Train movement state
   const startAngle = Math.PI + 0.6;
@@ -317,7 +357,8 @@ function Scene({ handPos, isPinching, words, onWordGrab, onWordDrop, onWordClick
   const trainStartTimeRef = useRef(null); // When train started moving
   
   // Access the audio service to get the beat
-  const [bounce, setBounce] = useState(0);
+  // Removed bounce state for performance
+  // const [bounce, setBounce] = useState(0);
   
   // Determine which words to show
   // If playing, show the dropped words (lyrics) in a stage formation
@@ -387,18 +428,7 @@ function Scene({ handPos, isPinching, words, onWordGrab, onWordDrop, onWordClick
   };
   
   useFrame((state, delta) => {
-    // Only animate beat if playing
-    if (!isPlaying) {
-      if (bounce > 0.01) setBounce(b => b * 0.9); // Decay to stop
-    } else {
-      // Simple beat detection based on time (120 BPM = 0.5s per beat)
-      const time = state.clock.getElapsedTime();
-      const beat = Math.sin(time * Math.PI * 4); // 120 BPM * 2 (for up/down)
-      
-      // Smooth bounce value
-      const bounceVal = Math.max(0, beat);
-      setBounce(bounceVal);
-    }
+    // Beat calculation logic moved to individual components for performance!
   });
   
   const recentlyGrabbed = useRef(new Set());
@@ -424,8 +454,8 @@ function Scene({ handPos, isPinching, words, onWordGrab, onWordDrop, onWordClick
     }
   });
 
-  // Grab Logic - Uses SCREEN SPACE comparison (2D) for accurate visual overlap
-  useFrame(() => {
+  // Grab Logic & Gesture Detection
+  useFrame((state, delta) => {
     // Always calculate hover state if hand is present
     // AND only if NOT playing (can't grab words during song)
     if (handPos && !isPlaying) {
@@ -480,22 +510,74 @@ function Scene({ handPos, isPinching, words, onWordGrab, onWordDrop, onWordClick
         setHoveredWordIdx(closestIdx);
       }
 
-      // Check for grab
-      if (isPinching && closestCloud) {
-          recentlyGrabbed.current.add(closestCloud.text);
-          setTimeout(() => {
-            recentlyGrabbed.current.delete(closestCloud.text);
-          }, 500);
+      // Check for grab vs Sing Gesture
+      if (isPinching) {
+          if (closestCloud) {
+              // Grabbing a word
+              recentlyGrabbed.current.add(closestCloud.text);
+              setTimeout(() => {
+                recentlyGrabbed.current.delete(closestCloud.text);
+              }, 500);
+              
+              onWordGrab(closestCloud);
+              onWordDrop(closestCloud);
+              
+              // Reset gesture if grabbing
+              gestureProgress.current = 0;
+          } else {
+              // Pinching EMPTY AIR -> Sing Gesture!
+              // Only if we have collected words
+              if (droppedWords.length > 0) {
+                  gestureProgress.current += delta;
+                  if (gestureProgress.current > GESTURE_THRESHOLD) {
+                      onGestureSing();
+                      gestureProgress.current = 0;
+                  }
+              }
+          }
+      } else {
+          // Not pinching
+          gestureProgress.current = 0;
+      }
+
+      // Update Gesture Ring Visual
+      if (gestureRingRef.current && handPos) {
+          // Position: Unproject smoothed hand pos to 3D space in front of camera
+          // We need a position that follows the cursor but exists in 3D world
+          const vec = new THREE.Vector3(
+            (smoothedHandPos.current.x * 2) - 1,
+            -(smoothedHandPos.current.y * 2) + 1,
+            0.5 
+          );
+          vec.unproject(camera);
+          const dir = vec.sub(camera.position).normalize();
+          const distance = 10; // Fixed distance
+          const pos = camera.position.clone().add(dir.multiplyScalar(distance));
           
-          onWordGrab(closestCloud);
-          onWordDrop(closestCloud);
+          gestureRingRef.current.position.copy(pos);
+          gestureRingRef.current.lookAt(camera.position);
+          
+          const progress = Math.min(gestureProgress.current / GESTURE_THRESHOLD, 1);
+          const scale = progress * 0.8 + 0.01; // Grow from 0
+          gestureRingRef.current.scale.setScalar(scale);
+          gestureRingRef.current.visible = progress > 0.01;
+          
+          // Color pulse
+          if (gestureRingRef.current.material) {
+             gestureRingRef.current.material.opacity = 0.5 + progress * 0.5;
+             gestureRingRef.current.material.color.setHSL(progress * 0.3, 1, 0.5); // Red to Green
+          }
       }
     } else {
       if (hoveredWordIdx !== -1) setHoveredWordIdx(-1);
+      gestureProgress.current = 0;
+      if (gestureRingRef.current) gestureRingRef.current.visible = false;
     }
   });
   
   useFrame((state, delta) => {
+    const t = state.clock.getElapsedTime(); // Define time variable for groove animations
+
     if (trainRef.current) {
       const loopLength = Math.PI * 2;
 
@@ -543,10 +625,27 @@ function Scene({ handPos, isPinching, words, onWordGrab, onWordDrop, onWordClick
       trainRef.current.rotation.x = rotationX;
     }
     
+    // Animate Phase Text
+    if (phaseTextRef.current) {
+         // Float up and down
+         phaseTextRef.current.position.y = 3.5 + Math.sin(t * 2) * 0.3;
+         // Gentle rotation wobble
+         phaseTextRef.current.rotation.z = Math.sin(t * 1.5) * 0.05;
+         // Scale pulse
+         const scale = 1 + Math.sin(t * 4) * 0.05;
+         phaseTextRef.current.scale.set(scale, scale, scale);
+    }
+    
     // Camera control
+    // 1. Hand Tracking Control
     // Only move camera if hand detected AND NOT pinching
     // This prevents "shaky screen" while trying to drag words
     // Uses smoothed hand position for smoother camera movement
+    
+    // Groove Factors
+    const grooveBob = isPlaying ? Math.sin(t * 8) * 0.15 : 0; // Vertical bounce
+    const grooveSway = isPlaying ? Math.sin(t * 4) * 0.01 : 0; // Slight tilt
+    
     if (handPos && !isPinching) {
       const targetX = (0.5 - smoothedHandPos.current.x) * 40; 
       const targetY = (smoothedHandPos.current.y) * 15 + 5;   
@@ -554,9 +653,12 @@ function Scene({ handPos, isPinching, words, onWordGrab, onWordDrop, onWordClick
       
       const lerpSpeed = 0.05;
       state.camera.position.x += (targetX - state.camera.position.x) * lerpSpeed;
-      state.camera.position.y += (targetY - state.camera.position.y) * lerpSpeed;
+      state.camera.position.y += (targetY - state.camera.position.y + grooveBob) * lerpSpeed; // Add groove
       state.camera.position.z += (targetZ - state.camera.position.z) * lerpSpeed;
+      
       state.camera.lookAt(0, 6, 0); 
+      // state.camera.rotation.z = grooveSway; // Removed sway to ensure stable interactions
+      
     } else if (!handPos) {
       // Only return to default if hand is NOT detected at all
       // If pinching, we do nothing (hold current view stable)
@@ -566,9 +668,11 @@ function Scene({ handPos, isPinching, words, onWordGrab, onWordDrop, onWordClick
       const lerpSpeed = 0.02;
       
       state.camera.position.x += (defaultX - state.camera.position.x) * lerpSpeed;
-      state.camera.position.y += (defaultY - state.camera.position.y) * lerpSpeed;
+      state.camera.position.y += (defaultY - state.camera.position.y + grooveBob) * lerpSpeed; // Add groove
       state.camera.position.z += (defaultZ - state.camera.position.z) * lerpSpeed;
+      
       state.camera.lookAt(0, 6, 0); 
+      // state.camera.rotation.z = grooveSway; 
     }
     // If pinching (handPos && isPinching), we skip updates to keep camera steady
   });
@@ -583,12 +687,12 @@ function Scene({ handPos, isPinching, words, onWordGrab, onWordDrop, onWordClick
       
       <Track isPlaying={isPlaying} />
       <group>
-        <Train ref={trainRef} bounce={bounce} />
+        <Train ref={trainRef} isPlaying={isPlaying} />
       </group>
       <Station isPlaying={isPlaying} position={[-11.3, 3.0, -7.9]} rotation={[0, 0.6, 0]} />
       {/* Trees closer to track (boundary reduced from 100 to 60) */}
-      <Trees count={10} boundary={60} bounce={bounce} />
-      <Mountains count={2} boundary={140} />
+      <Trees count={10} boundary={60} isPlaying={isPlaying} />
+      <Mountains count={2} boundary={140} isPlaying={isPlaying} />
       
       {/* Adjusted balloons to be visible in the camera frustum (y=14, z=34 view) */}
       {/* Previous positions were [40, 30, -40] and [-40, 35, 40]. Too high/far. */}
@@ -650,6 +754,40 @@ function Scene({ handPos, isPinching, words, onWordGrab, onWordDrop, onWordClick
           />
         );
       })}
+
+      {/* 3D Phase Text on Track - ONLY for "Your Turn" */}
+      {currentPhase === 'playing' && sessionPhase === 'YOUR_TURN' && (
+        <group ref={phaseTextRef} position={[0, 3.5, 5]}> 
+           {/* Shadow/Depth Layer */}
+           <Text
+             fontSize={2.0}
+             color="#EC407A"
+             position={[0.15, -0.15, -0.05]}
+             anchorX="center"
+             anchorY="middle"
+           >
+             Your Turn!
+           </Text>
+           
+           {/* Main Layer */}
+           <Text
+             fontSize={2.0}
+             color="#F8BBD0" 
+             anchorX="center"
+             anchorY="middle"
+             outlineWidth={0.15}
+             outlineColor="white"
+           >
+             Your Turn!
+           </Text>
+        </group>
+      )}
+      
+      {/* Gesture Feedback Ring */}
+      <mesh ref={gestureRingRef} visible={false}>
+         <ringGeometry args={[0.5, 0.7, 32]} />
+         <meshBasicMaterial color="#FFD700" transparent opacity={0.8} side={THREE.DoubleSide} />
+      </mesh>
     </>
   );
 }
@@ -668,6 +806,10 @@ function App() {
   
   // Track which word is currently being sung for visuals
   const [activeWordText, setActiveWordText] = useState(null);
+  
+  // Phase state for 3D text
+  const [currentPhase, setCurrentPhase] = useState('idle');
+  const [sessionPhase, setSessionPhase] = useState(null);
 
   // Magenta model state - loaded at app startup
   const [modelsReady, setModelsReady] = useState(false);
@@ -765,6 +907,17 @@ function App() {
   const handleWordDrop = (word) => {
      // Auto-collect - no need to check drop zone hover
      console.log("Collected word:", word);
+     
+     // Play pop sound! 🎵
+     // Use woodblock or bongo for a satisfying "pop"
+     // Initialize audio first just in case
+     audioService.initialize().then(() => {
+        audioService.triggerDrum('woodblock', 0.8); 
+        audioService.triggerDrum('bongo', 0.5);
+     }).catch(() => {
+        // Silent fail if not initialized
+     });
+
      setWords(prev => prev.filter(w => w.text !== word.text));
      setDroppedWords(prev => [...prev, word]);
      // Don't auto-play - word goes to lyrics area for selection
@@ -776,6 +929,7 @@ function App() {
     setIsPlaying(false);
     setIsActuallyPlaying(false);
     setActiveWordText(null); // Reset active word
+    setDroppedWords([]); // Clear words to start fresh!
   };
 
   // Called when playback is stopped early
@@ -822,6 +976,11 @@ function App() {
   // Handler for when a specific word starts playing (for visual effects)
   const handleWordActive = (wordText) => {
     setActiveWordText(wordText);
+  };
+  
+  const handlePhaseChange = (phase, sPhase) => {
+      setCurrentPhase(phase);
+      setSessionPhase(sPhase);
   };
   
   useEffect(() => {
@@ -909,49 +1068,76 @@ function App() {
            musicDuration={musicDuration}
            activeWordText={activeWordText}
            droppedWords={droppedWords}
+           onGestureSing={handleSing}
+           currentPhase={currentPhase}
+           sessionPhase={sessionPhase}
         />
       </Canvas>
       
+      {/* WordWave Input - Floating Aesthetic */}
+      {!isPlaying && ( 
       <div style={{
         position: 'absolute',
-        bottom: 140, 
-        left: '50%',
-        transform: 'translateX(-50%)',
+        top: 30,
+        left: 30,
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
-        gap: '10px',
-        pointerEvents: 'auto' // Enable interaction for input
+        alignItems: 'flex-start',
+        gap: '12px',
+        pointerEvents: 'auto',
+        zIndex: 50
       }}>
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.9)',
-          padding: '10px 20px',
-          borderRadius: '20px',
-          border: '3px solid #FFB74D',
-          textAlign: 'center',
-          boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
+        {/* Title Text - Free floating with cartoon style */}
+        <h1 style={{ 
+          margin: 0, 
+          color: '#29B6F6', 
+          fontSize: '42px', 
+          fontFamily: '"Nunito", "Comic Sans MS", sans-serif',
+          fontWeight: '900',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          // Cartoon text effect
+          textShadow: '3px 3px 0px white, 0 4px 12px rgba(0,0,0,0.1)',
+          letterSpacing: '-1px'
         }}>
-          <h2 style={{ margin: '0 0 5px 0', color: '#FF7043', fontSize: '20px' }}>Word Cloud Sky</h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#555' }}>Topic:</span>
-            <input 
-              type="text" 
-              value={topic} 
-              onChange={(e) => setTopic(e.target.value)}
-              style={{
-                border: '2px solid #B3E5FC',
-                borderRadius: '10px',
-                padding: '5px 10px',
-                fontFamily: 'inherit',
-                fontSize: '14px',
-                color: '#546E7A',
-                outline: 'none',
-                width: '100px'
-              }}
-            />
-          </div>
+          WordWave
+        </h1>
+
+        {/* Topic Input - Transparent floating pill */}
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '10px',
+          background: 'transparent', // Fully transparent container
+          padding: '0px 8px', // Minimal padding
+        }}>
+          <span style={{ fontSize: '18px', fontWeight: '800', color: '#78909C', textShadow: '1px 1px 0px white' }}>Topic:</span>
+          <input 
+            type="text" 
+            value={topic} 
+            onChange={(e) => setTopic(e.target.value)}
+            style={{
+              border: '2px solid rgba(255, 255, 255, 0.8)', // Subtle white border instead of background
+              borderRadius: '20px',
+              padding: '8px 16px',
+              fontFamily: 'inherit',
+              fontSize: '16px',
+              color: '#455A64',
+              outline: 'none',
+              width: '140px',
+              background: 'rgba(255, 255, 255, 0.3)', // Semi-transparent input
+              backdropFilter: 'blur(4px)',
+              fontWeight: 'bold',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
+              transition: 'all 0.2s ease'
+            }}
+            onFocus={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.6)'}
+            onBlur={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.3)'}
+          />
         </div>
       </div>
+      )}
       
       <DropZone
         droppedWords={droppedWords}
@@ -964,14 +1150,25 @@ function App() {
         onPlaybackStatusChange={handlePlaybackStatusChange}
         onMusicDurationCalculated={handleMusicDurationCalculated}
         onWordActive={handleWordActive}
+        cameraEnabled={cameraEnabled}
+        onPhaseChange={handlePhaseChange}
+      />
+
+      {/* ElevenLabs Voice Agent (bottom-right) */}
+      <VoiceAgent 
+        droppedWords={droppedWords}
+        topic={topic}
+        isPlaying={isActuallyPlaying}
+        onSing={handleSing}
+        onClearLyrics={() => setDroppedWords([])}
       />
       
-      {/* Camera toggle button */}
+      {/* Camera toggle button - Moved to Top Right to avoid overlap */}
       <button
         onClick={() => setCameraEnabled(!cameraEnabled)}
         style={{
           position: 'absolute',
-          bottom: 20,
+          top: 20,
           right: 20,
           padding: '12px 20px',
           borderRadius: '20px',
@@ -995,24 +1192,7 @@ function App() {
         {cameraEnabled ? '📷 Camera ON' : '🖱️ Mouse Mode'}
       </button>
 
-      {/* Instructions */}
-      <div style={{
-        position: 'absolute',
-        bottom: 20,
-        left: 20,
-        background: 'rgba(255, 255, 255, 0.9)',
-        padding: '10px 16px',
-        borderRadius: '12px',
-        fontSize: '13px',
-        color: '#546E7A',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-        zIndex: 100,
-        pointerEvents: 'none'
-      }}>
-        {cameraEnabled 
-          ? '🦆 Use hand gestures to grab words!' 
-          : '🖱️ Click on word clouds to collect them!'}
-      </div>
+      {/* Instructions removed as per request */}
     </div>
   );
 }
