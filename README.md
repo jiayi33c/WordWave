@@ -31,6 +31,3 @@ While WordWave is an early prototype, it points toward broader possibilities for
 *   **Audio**: Tone.js, Magenta.js, Web Audio API
 *   **Backend**: Convex (Serverless Functions)
 
----
-*Built for the Cursor Hackathon*
-
